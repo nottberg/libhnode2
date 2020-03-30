@@ -6,4 +6,4 @@ Supporting library for home automation framework.  (Version 2).
 2. cd build
 3. cmake ..
 4. make
-
+5. make package (To build debs)
