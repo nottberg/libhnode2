@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# Create a system account for use with the hnode2 services
+adduser --system --quiet --no-create-home --group hnode2
+
+# Create some space in /etc for hnode2 configuration info
+mkdir -p -m 775 /etc/hnode2
+chown hnode2:hnode2 /etc/hnode2
+
+mkdir -p -m 775 /var/cache/hnode2/
+chown hnode2:hnode2 /var/cache/hnode2/
+
+exit 0

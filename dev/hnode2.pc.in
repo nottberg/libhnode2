@@ -1,0 +1,13 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=@CMAKE_INSTALL_PREFIX@/bin
+libdir=@CMAKE_INSTALL_PREFIX@/lib
+includedir=@CMAKE_INSTALL_PREFIX@/include/hnode2
+
+Name: LibHNode2
+Description: C++ library for supporting hnode2 home automation framework applications.
+URL: 
+Version: @VERSION@
+Requires:
+Libs: -L${libdir} -lhnode2
+Cflags:
+
