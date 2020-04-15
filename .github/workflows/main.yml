@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Hello world action step
         id: hello
-        uses: nottberg/hnode2_build_action@v1
+        uses: nottberg/hnode2_build_action@master
         with:
           who-to-greet: 'Mona the Octocat'
       # Use the output from the `hello` step
