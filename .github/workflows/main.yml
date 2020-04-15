@@ -12,22 +12,35 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  hello_world_job:
     runs-on: ubuntu-latest
+    name: A job to say hello
+    steps:
+    - name: Hello world action step
+      id: hello
+      uses: nottberg/hnode2_build_action@v1
+      with:
+        who-to-greet: 'Mona the Octocat'
+    # Use the output from the `hello` step
+    - name: Get the output time
+      run: echo "The time was ${{ steps.hello.outputs.time }}"
+
+  # This workflow contains a single job called "build"
+  #build:
+    # The type of runner that the job will run on
+  #  runs-on: ubuntu-latest
 
     # Steps represent a sequence of tasks that will be executed as part of the job
-    steps:
+  #  steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - uses: actions/checkout@v2
+  #  - uses: actions/checkout@v2
 
     # Runs a set of commands using the runners shell
-    - name: Build Package
-      run: |
-        cd $GITHUB_WORKSPACE
-        mkdir build
-        cd build
-        cmake ..
-        make package
+  #  - name: Build Package
+  #    run: |
+  #      cd $GITHUB_WORKSPACE
+  #      mkdir build
+  #      cd build
+  #      cmake ..
+  #      make package
         
