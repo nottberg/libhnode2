@@ -16,15 +16,16 @@ jobs:
     runs-on: ubuntu-latest
     name: A job to say hello
     steps:
-    - name: Hello world action step
-      id: hello
-      - uses: actions/checkout@v2
-      uses: nottberg/hnode2_build_action@v1
-      with:
-        who-to-greet: 'Mona the Octocat'
-    # Use the output from the `hello` step
-    - name: Get the output time
-      run: echo "The time was ${{ steps.hello.outputs.time }}"
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Hello world action step
+        id: hello
+        uses: nottberg/hnode2_build_action@v1
+        with:
+          who-to-greet: 'Mona the Octocat'
+      # Use the output from the `hello` step
+      - name: Get the output time
+        run: echo "The time was ${{ steps.hello.outputs.time }}"
 
   # This workflow contains a single job called "build"
   #build:
