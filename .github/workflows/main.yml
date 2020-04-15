@@ -18,7 +18,7 @@ jobs:
     steps:
     - name: Hello world action step
       id: hello
-      uses: actions/checkout@v2
+      - uses: actions/checkout@v2
       uses: nottberg/hnode2_build_action@v1
       with:
         who-to-greet: 'Mona the Octocat'
