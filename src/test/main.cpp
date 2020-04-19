@@ -122,8 +122,9 @@ class HNode2TestApp : public Poco::Util::Application
             if( _httpServerTest == true )
             {
                 std::cout << "Running HNHttpServer test..." << std::endl;
-                HNHttpServer app;
-                return app.run(0, NULL);
+                //HNHttpServer app;
+                //app.start();
+                //sleep(300);
             }
             else if( _avahiTest == true )
             {

@@ -23,6 +23,7 @@ SET( HNODE2_LIB_SRC ${CMAKE_SOURCE_DIR}/src/lib/HNHttpServer.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNAvahi.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNodeID.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNodeConfig.cpp
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNDeviceRestHandler.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNodeDevice.cpp )
 
 SET( HNODE2_LIB_HDR ${CMAKE_SOURCE_DIR}/src/lib/HNHttpServer.h 

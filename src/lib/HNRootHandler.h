@@ -40,23 +40,23 @@ using Poco::Util::HelpFormatter;
 class HNodeRootRequestHandler: public HTTPRequestHandler
 {
     public:
-        HNodeRootRequestHandler(const std::string& format);
+        HNodeRootRequestHandler();
 
         void handleRequest(HTTPServerRequest& request, HTTPServerResponse& response);
 
     private:
-        std::string _format;
+        
 };
 
 class HNodeRootHandlerFactory: public HTTPRequestHandlerFactory
 {
     public:
-        HNodeRootHandlerFactory(const std::string& format);
+        HNodeRootHandlerFactory();
 
         HTTPRequestHandler* createRequestHandler(const HTTPServerRequest& request);
 
     private:
-        std::string _format;
+        
 };
 
 #endif // _H_HN_ROOT_HANDLER_H_

@@ -1,11 +1,12 @@
 #include "Poco/Net/HTTPServer.h"
-#include "Poco/Net/HTTPRequestHandler.h"
-#include "Poco/Net/HTTPRequestHandlerFactory.h"
+//#include "Poco/Net/HTTPRequestHandler.h"
+//#include "Poco/Net/HTTPRequestHandlerFactory.h"
 #include "Poco/Net/HTTPServerParams.h"
-#include "Poco/Net/HTTPServerRequest.h"
-#include "Poco/Net/HTTPServerResponse.h"
-#include "Poco/Net/HTTPServerParams.h"
+//#include "Poco/Net/HTTPServerRequest.h"
+//#include "Poco/Net/HTTPServerResponse.h"
+//#include "Poco/Net/HTTPServerParams.h"
 #include "Poco/Net/ServerSocket.h"
+#if 0
 #include "Poco/Timestamp.h"
 #include "Poco/DateTimeFormatter.h"
 #include "Poco/DateTimeFormat.h"
@@ -15,76 +16,42 @@
 #include "Poco/Util/Option.h"
 #include "Poco/Util/OptionSet.h"
 #include "Poco/Util/HelpFormatter.h"
+#endif
 #include <iostream>
 
 #include "Poco/String.h"
 
-#include "HNRootHandler.h"
+#include "HNDeviceRestHandler.h"
 #include "HNHttpServer.h"
 
+namespace pn = Poco::Net;
+
 HNHttpServer::HNHttpServer()
-: _helpRequested(false)
 {
+    port   = 8080;
+    srvPtr = NULL;
 }
 
 HNHttpServer::~HNHttpServer()
 {
+    if( srvPtr )
+        delete ((Poco::Net::HTTPServer*)srvPtr);
 }
 
-void 
-HNHttpServer::initialize(Application& self)
+void
+HNHttpServer::start( HNodeDevice *parent )
 {
-    loadConfiguration();
-    ServerApplication::initialize(self);
-}
+    std::cout << "Starting HttpServer..." << std::endl;
 
-void 
-HNHttpServer::uninitialize()
-{
-    ServerApplication::uninitialize();
-}
+    pn::ServerSocket svs(port);
 
-void 
-HNHttpServer::defineOptions(OptionSet& options)
-{
-    ServerApplication::defineOptions(options);
+    HNDeviceRestHandlerFactory *facPtr = new HNDeviceRestHandlerFactory( parent );
 
-    options.addOption(
-        Option("help", "h", "display argument help information")
-            .required(false)
-            .repeatable(false)
-            .callback(OptionCallback<HNHttpServer>(
-            this, &HNHttpServer::handleHelp)));
-}
+    facPtr->registerURI( "/", HNDeviceRestRoot::create );
+    facPtr->registerURI( "/hnode2/device/info", HNDeviceRestDevice::create );
 
-void 
-HNHttpServer::handleHelp(const std::string& name, 
-                const std::string& value)
-{
-    HelpFormatter helpFormatter(options());
+    srvPtr = (void *) new pn::HTTPServer( facPtr, svs, new pn::HTTPServerParams );
+    ((pn::HTTPServer*)srvPtr)->start();
     
-    helpFormatter.setCommand(commandName());
-    helpFormatter.setUsage("OPTIONS");
-    helpFormatter.setHeader("A web server that serves the current date and time.");
-    helpFormatter.format(std::cout);
-    stopOptionsProcessing();
-    _helpRequested = true;
-}
-
-int 
-HNHttpServer::main(const std::vector<std::string>& args)
-{
-    if (!_helpRequested)
-    {
-        unsigned short port = (unsigned short) config().getInt("HTTPTimeServer.port", 9980);
-        std::string format( config().getString("HTTPTimeServer.format", DateTimeFormat::SORTABLE_FORMAT));
-    
-        ServerSocket svs(port);
-        HTTPServer srv( new HNodeRootHandlerFactory(format), svs, new HTTPServerParams );
-        srv.start();
-        waitForTerminationRequest();
-        srv.stop();
-    }
-    
-    return Application::EXIT_OK;   
+     std::cout << "Started HttpServer..." << std::endl; 
 }
