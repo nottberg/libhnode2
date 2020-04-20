@@ -74,6 +74,8 @@ class HNCSection
 
         std::string getName();
 
+        HNC_RESULT_T getValueByName( std::string key, std::string &value );
+
         void getValuePairs( std::map< std::string, std::string > &pairs );
         void getListPairs( std::map< std::string, HNCObjList* > &pairs );
 

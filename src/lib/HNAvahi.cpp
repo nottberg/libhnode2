@@ -49,22 +49,12 @@ class HNAvahiRunner : public Poco::Runnable
 
 };
 
-HNAvahi::HNAvahi( std::string srvType, std::string srvName, uint16_t srvPort )
+HNAvahi::HNAvahi()
 {
     state = HNAVAHI_STATE_IDLE;
     failReason = HNAVAHI_ERR_NONE;
 
-    if( srvType.empty() == false )
-        serviceType = avahi_strdup( srvType.c_str() );
-    else
-        serviceType = NULL;
-
-    if( srvName.empty() == false )
-        serviceName = avahi_strdup( srvName.c_str() );
-    else
-        serviceName = NULL;
-
-    servicePort = srvPort;
+    servicePort = 0;
 
     client     = NULL; // AvahiClient
     group      = NULL; // AvahiEntryGroup
@@ -75,6 +65,26 @@ HNAvahi::HNAvahi( std::string srvType, std::string srvName, uint16_t srvPort )
 HNAvahi::~HNAvahi()
 {
     cleanup();
+}
+
+void
+HNAvahi::setID( std::string srvType, std::string srvName )
+{
+    if( srvType.empty() == false )
+        serviceType = avahi_strdup( srvType.c_str() );
+    else
+        serviceType = NULL;
+
+    if( srvName.empty() == false )
+        serviceName = avahi_strdup( srvName.c_str() );
+    else
+        serviceName = NULL;
+}
+ 
+void
+HNAvahi::setPort( uint16_t port )
+{
+    servicePort = port;
 }
 
 std::string 
@@ -374,8 +384,6 @@ HNAvahi::start()
         cleanup();
         return;
     }
-
-    serviceName = avahi_strdup( "hnode2Tester" );
 
     // Allocate a new client.
     client = avahi_client_new( avahi_simple_poll_get( (AvahiSimplePoll*) simplePoll ), 

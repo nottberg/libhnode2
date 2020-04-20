@@ -1,4 +1,10 @@
+#include <Poco/JSON/Object.h>
+#include <Poco/JSON/Parser.h>
+
 #include "HNDeviceRestHandler.h"
+
+namespace pjs = Poco::JSON;
+namespace pdy = Poco::Dynamic;
 
 HNDeviceRestDevice::HNDeviceRestDevice( HNodeDevice *parent )
 : _parent( parent )
@@ -9,17 +15,30 @@ HNDeviceRestDevice::HNDeviceRestDevice( HNodeDevice *parent )
 void 
 HNDeviceRestDevice::handleRequest( pn::HTTPServerRequest& request, pn::HTTPServerResponse& response )
 {
-    //Application& app = Application::instance();
-    //app.logger().information("Request from " + request.clientAddress().toString());
-
-    //Timestamp now;
-    //std::string dt(DateTimeFormatter::format(now, _format));
-
     response.setChunkedTransferEncoding(true);
-    response.setContentType("text/html");
+    response.setContentType("application/json");
 
     std::ostream& ostr = response.send();
-    ostr << "{\"test\":\"param\"}";
+
+    // Create a json root object
+    pjs::Object jsRoot;
+
+    jsRoot.set( "hnodeID", _parent->getHNodeIDStr() );
+    jsRoot.set( "crc32ID", _parent->getHNodeIDCRC32Str() );
+
+    jsRoot.set( "name", _parent->getName() );
+
+    try
+    {
+        // Write out the generated json
+        pjs::Stringifier::stringify( jsRoot, ostr, 1 );
+    }
+    catch( ... )
+    {
+        ostr << "{\"error\":\"Internal Error\"}";
+        return;
+    }
+
 }
 
 pn::HTTPRequestHandler* 
@@ -37,17 +56,11 @@ HNDeviceRestRoot::HNDeviceRestRoot( HNodeDevice *parent )
 void 
 HNDeviceRestRoot::handleRequest( pn::HTTPServerRequest& request, pn::HTTPServerResponse& response )
 {
-    //Application& app = Application::instance();
-    //app.logger().information("Request from " + request.clientAddress().toString());
-
-    //Timestamp now;
-    //std::string dt(DateTimeFormatter::format(now, _format));
-
     response.setChunkedTransferEncoding(true);
     response.setContentType("text/html");
 
     std::ostream& ostr = response.send();
-    ostr << "{\"test\":\"param\"}";
+    ostr << "<html><body><h2>This is a hnode2 device</h2></body></html>";
 }
 
 pn::HTTPRequestHandler* 

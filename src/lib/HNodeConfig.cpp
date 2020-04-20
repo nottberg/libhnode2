@@ -167,6 +167,21 @@ HNCSection::clearValue( std::string key )
     pairMap.erase( key );
 }
 
+HNC_RESULT_T 
+HNCSection::getValueByName( std::string key, std::string &value )
+{
+    value.clear();
+
+    std::map< std::string, std::string >::iterator it = pairMap.find( key );
+
+    if( it == pairMap.end() )
+        return HNC_RESULT_FAILURE;
+
+    value = it->second;
+
+    return HNC_RESULT_SUCCESS;
+}
+
 void 
 HNCSection::getValuePairs( std::map< std::string, std::string > &pairs )
 {

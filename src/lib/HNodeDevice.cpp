@@ -1,3 +1,4 @@
+#if 0
 #include "Poco/Net/HTTPServer.h"
 #include "Poco/Net/HTTPRequestHandler.h"
 #include "Poco/Net/HTTPRequestHandlerFactory.h"
@@ -15,23 +16,42 @@
 #include "Poco/Util/Option.h"
 #include "Poco/Util/OptionSet.h"
 #include "Poco/Util/HelpFormatter.h"
+#endif
+
 #include <iostream>
 
 #include "Poco/String.h"
 
 #include "HNAvahi.h"
-#include "HNRootHandler.h"
+//#include "HNRootHandler.h"
+#include "HNodeConfig.h"
 #include "HNodeDevice.h"
 
-HNodeDevice::HNodeDevice()
-: avObj( "_hnode2-http._tcp", "hnode2TestApp", 651 )
+HNodeDevice::HNodeDevice( std::string deviceType, std::string instance )
 {
+    devType     = deviceType;
+    devInstance = instance;
 
+    port        = 8080;
 }
 
 HNodeDevice::~HNodeDevice()
 {
 
+}
+
+std::string 
+HNodeDevice::getHNodeIDStr()
+{
+    std::string rstStr;
+    hnodeID.getStr( rstStr );
+    return rstStr;
+}
+
+std::string 
+HNodeDevice::getHNodeIDCRC32Str()
+{
+    return hnodeID.getCRC32AsHexStr();
 }
 
 void 
@@ -46,19 +66,137 @@ HNodeDevice::getName()
     return name;
 }
 
+std::string
+HNodeDevice::createAvahiName()
+{
+    char tmpBuf[256];
+
+    sprintf( tmpBuf, "%s-%s-%s", devType.c_str(), devInstance.c_str(), hnodeID.getCRC32AsHexStr().c_str() );
+
+    return tmpBuf;
+}
+
+#define HND_CFGFILE_ROOT_DEFAULT  "/etc/hnode2/"
+
+bool 
+HNodeDevice::configExists()
+{
+    HNodeConfigFile cfgFile;
+
+    cfgFile.setRootPath( HND_CFGFILE_ROOT_DEFAULT );
+
+    return cfgFile.configExists( devType, devInstance );
+}
+
+HND_RESULT_T
+HNodeDevice::loadConfig()
+{
+    std::string     rstStr;
+    HNodeConfigFile cfgFile;
+    HNodeConfig     cfg;
+
+    std::cout << "Loading config..." << std::endl;
+
+    cfgFile.setRootPath( HND_CFGFILE_ROOT_DEFAULT );
+
+    if( cfgFile.loadConfig( devType, devInstance, cfg ) != HNC_RESULT_SUCCESS )
+    {
+        std::cout << "ERROR: Could not load saved configuration." << std::endl;
+        return HND_RESULT_FAILURE;
+    }
+
+    HNCSection *secPtr;
+    cfg.updateSection( "device", &secPtr );
+
+    // Read out the HNodeID
+    if( secPtr->getValueByName( "hnodeID", rstStr ) != HNC_RESULT_SUCCESS )
+    {
+        return HND_RESULT_FAILURE;
+    }
+
+    hnodeID.setFromStr( rstStr );
+
+    // Read the name field
+    if( secPtr->getValueByName( "name", rstStr ) != HNC_RESULT_SUCCESS )
+    {
+        return HND_RESULT_FAILURE;
+    }
+
+    setName( rstStr );
+  
+    return HND_RESULT_SUCCESS;
+}
+
+HND_RESULT_T
+HNodeDevice::saveConfig()
+{
+    std::string rstStr;
+    HNodeConfigFile cfgFile;
+    HNodeConfig     cfg;
+
+    HNCSection *secPtr;
+    cfg.updateSection( "device", &secPtr );
+ 
+    hnodeID.getStr( rstStr );
+    secPtr->updateValue( "hnodeID", rstStr );
+
+    secPtr->updateValue( "name", getName() );
+
+    //cfg.updateSection( "owner", &secPtr );
+    //secPtr->updateValue( "test2", "value4" );
+             
+    cfgFile.setRootPath( HND_CFGFILE_ROOT_DEFAULT );
+
+    std::cout << "Saving config..." << std::endl;
+    if( cfgFile.saveConfig( devType, devInstance, cfg ) != HNC_RESULT_SUCCESS )
+    {
+        std::cout << "ERROR: Could not save initial configuration." << std::endl;
+        return HND_RESULT_FAILURE;
+    }
+
+    return HND_RESULT_SUCCESS;
+}
+
+void
+HNodeDevice::initToDefaults()
+{
+    // Create a new uuid
+    hnodeID.create();
+
+    // Set a default name
+    setName( "Name" );
+}
+
 void
 HNodeDevice::start()
 {
-    //HNAvahi avObj( "_hnode2-http._tcp", "hnode2TestApp", 651 );
+    std::string rstStr;
+
+    std::cout << "Looking for config file" << std::endl;
+    
+    if( configExists() == false )
+    {
+        initToDefaults();
+        saveConfig();
+    }
+
+    loadConfig();
+
+    std::cout << "Done loading configuration" << std::endl;
 
     std::cout << "Starting HNAvahi..." << std::endl;
 
-    avObj.setSrvPair( "hnodeid", "12:34:45:67:89:01:23:45:12:34:45:67:89:01:23:45" );
-    avObj.setSrvPair( "paired", "false" );
-    avObj.setSrvTag( "tst-tag" );
+    avObj.setID( "_hnode2-rest-http._tcp", createAvahiName() );
+    avObj.setPort( port );
+
+    hnodeID.getStr( rstStr );    
+    avObj.setSrvPair( "hnodeID", rstStr );
+    avObj.setSrvPair( "crc32ID", hnodeID.getCRC32AsHexStr() );
+    avObj.setSrvPair( "name", getName() );
 
     avObj.start();
 
-
     std::cout << "Started HNAvahi..." << std::endl;
+
+    rest.start( this );
 }

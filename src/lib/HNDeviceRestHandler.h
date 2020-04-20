@@ -9,10 +9,9 @@
 #include "Poco/Net/HTTPServerRequest.h"
 #include "Poco/Net/HTTPServerResponse.h"
 
-namespace pn = Poco::Net;
+#include "HNodeDevice.h"
 
-// Forward declaration for pointers below.
-class HNodeDevice;
+namespace pn = Poco::Net;
 
 // Handle the pre-defined "/hnode2/device/" requests
 class HNDeviceRestDevice: public pn::HTTPRequestHandler

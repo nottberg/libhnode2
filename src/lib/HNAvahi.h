@@ -61,8 +61,11 @@ class HNAvahi
         bool hasClient();
 
     public:
-        HNAvahi( std::string srvType, std::string srvName, uint16_t port );
+        HNAvahi();
        ~HNAvahi();
+
+        void setID( std::string srvType, std::string srvName );
+        void setPort( uint16_t port );
 
         std::string getSrvType();
         std::string getSrvName();

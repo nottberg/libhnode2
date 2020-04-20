@@ -129,8 +129,11 @@ class HNode2TestApp : public Poco::Util::Application
             else if( _avahiTest == true )
             {
                 std::cout << "Running HNAvahi test..." << std::endl;
-                HNAvahi avObj( "_hnode2-http._tcp", "hnode2TestApp", 651 );
+                HNAvahi avObj;
 
+                avObj.setID( "_hnode2-http._tcp", "hnode2TestApp" );
+                avObj.setPort( 651 );
+ 
                 avObj.setSrvPair( "hnodeid", "12:34:45:67:89:01:23:45:12:34:45:67:89:01:23:45" );
                 avObj.setSrvPair( "paired", "false" );
                 avObj.setSrvTag( "tst-tag" );
