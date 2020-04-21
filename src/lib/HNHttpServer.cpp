@@ -49,6 +49,7 @@ HNHttpServer::start( HNodeDevice *parent )
 
     facPtr->registerURI( "/", HNDeviceRestRoot::create );
     facPtr->registerURI( "/hnode2/device/info", HNDeviceRestDevice::create );
+    facPtr->registerURI( "/hnode2/device/owner", HNDeviceRestDevice::create );
 
     srvPtr = (void *) new pn::HTTPServer( facPtr, svs, new pn::HTTPServerParams );
     ((pn::HTTPServer*)srvPtr)->start();

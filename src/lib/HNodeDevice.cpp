@@ -31,13 +31,34 @@ HNodeDevice::HNodeDevice( std::string deviceType, std::string instance )
 {
     devType     = deviceType;
     devInstance = instance;
+    version     = "2.0.0";
 
     port        = 8080;
+
+    ownerState  = "available";
 }
 
 HNodeDevice::~HNodeDevice()
 {
 
+}
+
+std::string 
+HNodeDevice::getInstance()
+{
+    return devInstance;
+}
+
+std::string 
+HNodeDevice::getDeviceType()
+{
+    return devType;
+}
+
+std::string 
+HNodeDevice::getVersionStr()
+{
+    return version;
 }
 
 std::string 
@@ -64,6 +85,20 @@ std::string
 HNodeDevice::getName()
 {
     return name;
+}
+
+std::string 
+HNodeDevice::getOwnerState()
+{
+    return ownerState;
+}
+
+std::string 
+HNodeDevice::getOwnerHNodeIDStr()
+{
+    std::string rstStr;
+    ownerHNodeID.getStr( rstStr );
+    return rstStr;
 }
 
 std::string

@@ -18,14 +18,19 @@ class HNodeDevice
     private:
         std::string  devType;
         std::string  devInstance;
+        std::string  version;
+
+        uint16_t     port;
 
         HNodeID      hnodeID;
 
         std::string  name;
- 
+
+        std::string  ownerState;
+        HNodeID      ownerHNodeID;
+
         HNAvahi      avObj;
 
-        uint16_t     port;
         HNHttpServer rest;
 
         std::string createAvahiName();
@@ -38,6 +43,10 @@ class HNodeDevice
         HNodeDevice( std::string deviceType, std::string devInstance );
        ~HNodeDevice();
 
+        std::string getInstance();
+        std::string getDeviceType();
+        std::string getVersionStr();
+
         std::string getHNodeIDStr();
         std::string getHNodeIDCRC32Str();
 
@@ -47,9 +56,14 @@ class HNodeDevice
         void setPort( uint16_t port );
         uint16_t getPort();
 
+        std::string getOwnerState();
+        std::string getOwnerHNodeIDStr();
+
         void initToDefaults();
 
         void start();
+
+
 };
 
 #endif // __HNODE_DEVICE_H__

@@ -1,5 +1,6 @@
 #include <Poco/JSON/Object.h>
 #include <Poco/JSON/Parser.h>
+#include <Poco/URI.h>
 
 #include "HNDeviceRestHandler.h"
 
@@ -15,30 +16,68 @@ HNDeviceRestDevice::HNDeviceRestDevice( HNodeDevice *parent )
 void 
 HNDeviceRestDevice::handleRequest( pn::HTTPServerRequest& request, pn::HTTPServerResponse& response )
 {
-    response.setChunkedTransferEncoding(true);
-    response.setContentType("application/json");
+    std::vector< std::string > pSegs;
+    Poco::URI uri( request.getURI() );
 
-    std::ostream& ostr = response.send();
-
-    // Create a json root object
-    pjs::Object jsRoot;
-
-    jsRoot.set( "hnodeID", _parent->getHNodeIDStr() );
-    jsRoot.set( "crc32ID", _parent->getHNodeIDCRC32Str() );
-
-    jsRoot.set( "name", _parent->getName() );
-
-    try
+    if( request.getMethod() == "GET" )
     {
-        // Write out the generated json
-        pjs::Stringifier::stringify( jsRoot, ostr, 1 );
-    }
-    catch( ... )
-    {
-        ostr << "{\"error\":\"Internal Error\"}";
-        return;
-    }
+        // Create a json root object
+        pjs::Object jsRoot;
 
+        uri.getPathSegments( pSegs );
+
+        if( "info" == pSegs.back() )
+        {
+            response.setChunkedTransferEncoding(true);
+            response.setContentType("application/json");
+
+            jsRoot.set( "hnodeID", _parent->getHNodeIDStr() );
+            jsRoot.set( "crc32ID", _parent->getHNodeIDCRC32Str() );
+ 
+            jsRoot.set( "name", _parent->getName() );
+
+            jsRoot.set( "instance", _parent->getInstance() );
+
+            jsRoot.set( "deviceType", _parent->getDeviceType() );
+            jsRoot.set( "version", _parent->getVersionStr() );
+        }
+        else if( "owner" == pSegs.back() )
+        {
+            response.setChunkedTransferEncoding(true);
+            response.setContentType("application/json");
+
+            jsRoot.set( "state", _parent->getOwnerState() );
+            jsRoot.set( "hnodeID", _parent->getOwnerHNodeIDStr() );
+        }
+        else
+        {
+            // Should not occur - URL not implmented.
+            response.setStatusAndReason( pn::HTTPServerResponse::HTTP_NOT_IMPLEMENTED );
+            return;
+        }
+
+        // Render the response
+        std::ostream& ostr = response.send();
+        try
+        {
+            // Write out the generated json
+            pjs::Stringifier::stringify( jsRoot, ostr, 1 );
+        }
+        catch( ... )
+        {
+            response.setStatusAndReason( pn::HTTPServerResponse::HTTP_INTERNAL_SERVER_ERROR );
+            return;
+        }
+
+
+
+    }
+    else
+    {
+         // Indicate method not supported for this URL.
+         response.setStatusAndReason( pn::HTTPServerResponse::HTTP_METHOD_NOT_ALLOWED );
+         return;
+    }
 }
 
 pn::HTTPRequestHandler* 
@@ -56,6 +95,13 @@ HNDeviceRestRoot::HNDeviceRestRoot( HNodeDevice *parent )
 void 
 HNDeviceRestRoot::handleRequest( pn::HTTPServerRequest& request, pn::HTTPServerResponse& response )
 {
+    if( request.getMethod() != "GET" )
+    {
+         // Indicate method not supported for this URL.
+         response.setStatusAndReason( pn::HTTPServerResponse::HTTP_METHOD_NOT_ALLOWED );
+         return;
+    }
+
     response.setChunkedTransferEncoding(true);
     response.setContentType("text/html");
 
@@ -97,6 +143,8 @@ HNDeviceRestHandlerFactory::createRequestHandler( const pn::HTTPServerRequest& r
     if( it == uriMap.end() )
     {
         // Unsupported, return NULL
+        pn::HTTPServerResponse& response = request.response();
+        response.setStatusAndReason( pn::HTTPServerResponse::HTTP_NOT_IMPLEMENTED );
         return NULL;
     }
 

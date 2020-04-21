@@ -23,6 +23,7 @@ main( int argc, char** argv )
 
 #include "HNHttpServer.h"
 #include "HNAvahi.h"
+#include "HNAvahiBrowser.h"
 #include "HNodeID.h"
 #include "HNodeConfig.h"
 
@@ -32,6 +33,7 @@ class HNode2TestApp : public Poco::Util::Application
         bool _helpRequested;
         bool _httpServerTest;
         bool _avahiTest;
+        bool _avahiBrowserTest;
         bool _hnodeIDTest;
         bool _hnodeConfigTest;
 
@@ -49,11 +51,12 @@ class HNode2TestApp : public Poco::Util::Application
 
         void defineOptions( Poco::Util::OptionSet& optionSet )
         {
-            _helpRequested   = false;
-            _httpServerTest  = false;
-            _avahiTest       = false;
-            _hnodeIDTest     = false;
-            _hnodeConfigTest = false;
+            _helpRequested    = false;
+            _httpServerTest   = false;
+            _avahiTest        = false;
+            _avahiBrowserTest = false;
+            _hnodeIDTest      = false;
+            _hnodeConfigTest  = false;
 
             Poco::Util::Application::defineOptions( optionSet );
 
@@ -67,6 +70,10 @@ class HNode2TestApp : public Poco::Util::Application
 
             optionSet.addOption(
                 Poco::Util::Option( "avahi", "a", "Run Avahi test." ).callback( Poco::Util::OptionCallback<HNode2TestApp>(this, &HNode2TestApp::handleTest ) )
+            );
+
+            optionSet.addOption(
+                Poco::Util::Option( "avahi-browser", "b", "Run Avahi Browser test." ).callback( Poco::Util::OptionCallback<HNode2TestApp>(this, &HNode2TestApp::handleTest ) )
             );
 
             optionSet.addOption(
@@ -104,6 +111,8 @@ class HNode2TestApp : public Poco::Util::Application
                 _httpServerTest = true;
             else if( name == "avahi" )
                 _avahiTest = true;
+            else if( name == "avahi-browser" )
+                _avahiBrowserTest = true;
             else if( name == "hnodeid" )
                 _hnodeIDTest = true;
             else if( name == "hnodecfg" )
@@ -137,6 +146,15 @@ class HNode2TestApp : public Poco::Util::Application
                 avObj.setSrvPair( "hnodeid", "12:34:45:67:89:01:23:45:12:34:45:67:89:01:23:45" );
                 avObj.setSrvPair( "paired", "false" );
                 avObj.setSrvTag( "tst-tag" );
+
+                avObj.start();
+                sleep(30);
+                avObj.shutdown();
+            }
+            else if( _avahiBrowserTest == true )
+            {
+                std::cout << "Running HNAvahiBrowser test..." << std::endl;
+                HNAvahiBrowser avObj;
 
                 avObj.start();
                 sleep(30);
