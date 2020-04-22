@@ -20,7 +20,7 @@ HNodeID::HNodeID()
     valid = false;
 }
 
-HNodeID::HNodeID( HNodeID &src )
+HNodeID::HNodeID( const HNodeID &src )
 {
     memcpy( data, src.data, sizeof( data ) );
     valid = src.valid;
