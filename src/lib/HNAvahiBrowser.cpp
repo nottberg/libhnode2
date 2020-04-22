@@ -47,7 +47,8 @@ class HNAvahiBrowserRunner : public Poco::Runnable
 
 };
 
-HNAvahiBrowser::HNAvahiBrowser()
+HNAvahiBrowser::HNAvahiBrowser( std::string avahiType )
+: devType( avahiType )
 {
     state = HNAVAHI_BROWSER_STATE_IDLE;
     failReason = HNAVAHI_BROWSER_ERR_NONE;
@@ -140,7 +141,9 @@ HNAvahiBrowser::callbackResolve( void *r, uint interface, uint protocol, uint ev
 
         case AVAHI_RESOLVER_FOUND: 
         {
-            // Allocate a Event record
+            char a[AVAHI_ADDRESS_STR_MAX];
+
+            // Allocate an Event record
             HNAvahiBrowserEvent *event;
             if( hnaObj->eventQueue.getReleasedCnt() )
                 event = (HNAvahiBrowserEvent*) hnaObj->eventQueue.freeRecord();
@@ -148,35 +151,30 @@ HNAvahiBrowser::callbackResolve( void *r, uint interface, uint protocol, uint ev
                 event = new HNAvahiBrowserEvent;
             
             // Fill in event data
-            event->setName( name );
+            avahi_address_snprint( a, sizeof(a), address );
+            event->setAddEvent( name, type, domain, host_name, a, port );
+
+            while( txt )
+            {
+                char* key;
+                char* value;
+                std::size_t size;
+                std::string valueStr;
+
+                avahi_string_list_get_pair( txt, &key, &value, &size );
+
+                if( value != NULL )
+                     valueStr.assign( value, size );
+
+                event->addTxtPair( key, valueStr );
+
+                avahi_free(key);
+                avahi_free(value);
+                txt = avahi_string_list_get_next( txt );
+            }
 
             // Add it to the event queue
             hnaObj->eventQueue.postRecord( event );
-            
-#if 0
-            char a[AVAHI_ADDRESS_STR_MAX], *t;
-            fprintf( stderr, "Service '%s' of type '%s' in domain '%s':\n", name, type, domain );
-            avahi_address_snprint( a, sizeof(a), address );
-            t = avahi_string_list_to_string( txt );
-            fprintf(stderr,
-                    "\t%s:%u (%s)\n"
-                    "\tTXT=%s\n"
-                    "\tcookie is %u\n"
-                    "\tis_local: %i\n"
-                    "\tour_own: %i\n"
-                    "\twide_area: %i\n"
-                    "\tmulticast: %i\n"
-                    "\tcached: %i\n",
-                    host_name, port, a,
-                    t,
-                    avahi_string_list_get_service_cookie( txt ),
-                    !!(flags & AVAHI_LOOKUP_RESULT_LOCAL),
-                    !!(flags & AVAHI_LOOKUP_RESULT_OUR_OWN),
-                    !!(flags & AVAHI_LOOKUP_RESULT_WIDE_AREA),
-                    !!(flags & AVAHI_LOOKUP_RESULT_MULTICAST),
-                    !!(flags & AVAHI_LOOKUP_RESULT_CACHED));
-            avahi_free( t );
-#endif
         }
     }
     avahi_service_resolver_free( resolver );
@@ -202,18 +200,34 @@ HNAvahiBrowser::callbackBrowse( void *b, uint interface, uint protocol, uint eve
         break;
 
         case AVAHI_BROWSER_NEW:
-            fprintf( stderr, "(Browser) NEW: service '%s' of type '%s' in domain '%s'\n", name, type, domain );
+            //fprintf( stderr, "(Browser) NEW: service '%s' of type '%s' in domain '%s'\n", name, type, domain );
             // We ignore the returned resolver object. In the callback
             //   function we free it. If the server is terminated before
             //   the callback function is called the server will free
             //   the resolver for us.
-            resolver = avahi_service_resolver_new( (AvahiClient *) hnaObj->client, interface, protocol, name, type, domain, AVAHI_PROTO_UNSPEC, (AvahiLookupFlags) 0, (AvahiServiceResolverCallback) HNAvahiBrowser::callbackResolve, hnaObj );
+            resolver = avahi_service_resolver_new( (AvahiClient *) hnaObj->client, interface, protocol,
+                                                    name, type, domain, AVAHI_PROTO_UNSPEC, (AvahiLookupFlags) 0,
+                                                   (AvahiServiceResolverCallback) HNAvahiBrowser::callbackResolve, hnaObj );
+
             if( resolver == NULL )
                 fprintf(stderr, "Failed to resolve service '%s': %s\n", name, avahi_strerror( avahi_client_errno( (AvahiClient *) hnaObj->client ) ) );
         break;
 
         case AVAHI_BROWSER_REMOVE:
-            fprintf( stderr, "(Browser) REMOVE: service '%s' of type '%s' in domain '%s'\n", name, type, domain );
+        {
+            // Allocate an Event record
+            HNAvahiBrowserEvent *event;
+            if( hnaObj->eventQueue.getReleasedCnt() )
+                event = (HNAvahiBrowserEvent*) hnaObj->eventQueue.freeRecord();
+            else
+                event = new HNAvahiBrowserEvent;
+            
+            // Fill in event data
+            event->setRemoveEvent( name, type, domain );
+
+            // Add it to the event queue
+            hnaObj->eventQueue.postRecord( event );
+        }
         break;
 
         case AVAHI_BROWSER_ALL_FOR_NOW:
@@ -285,7 +299,7 @@ HNAvahiBrowser::start()
 
     // Allocate a service browser
     serviceBrowser = avahi_service_browser_new( (AvahiClient *) client, AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, 
-                                                "_http._tcp", NULL, (AvahiLookupFlags) 0, 
+                                                devType.c_str(), NULL, (AvahiLookupFlags) 0, 
                                                 (AvahiServiceBrowserCallback) HNAvahiBrowser::callbackBrowse, this );
 
     if( serviceBrowser == NULL )
@@ -351,6 +365,55 @@ HNAvahiBrowserEvent::~HNAvahiBrowserEvent()
 }
 
 void 
+HNAvahiBrowserEvent::clear()
+{
+    evType = HNAB_EVTYPE_NOTSET;
+
+    name.clear();
+    type.clear();
+    domain.clear();
+
+    hostname.clear();
+    address.clear();
+    port = 0;
+
+    txtPairs.clear();
+}
+
+void 
+HNAvahiBrowserEvent::setAddEvent( std::string nm, std::string tp, std::string dm, std::string hn, std::string ad, uint16_t pt )
+{
+    clear();
+
+    evType = HNAB_EVTYPE_ADD;
+    name   = nm;
+    type   = tp;
+    domain = dm;
+
+    hostname = hn;
+    address  = ad;
+    port     = pt;
+
+}
+
+void 
+HNAvahiBrowserEvent::setRemoveEvent( std::string nm, std::string tp, std::string dm )
+{
+    clear();
+
+    evType = HNAB_EVTYPE_REMOVE;
+    name   = nm;
+    type   = tp;
+    domain = dm;
+}
+
+void 
+HNAvahiBrowserEvent::addTxtPair( std::string key, std::string value )
+{
+    txtPairs.insert( std::pair< std::string, std::string >( key, value ) );
+}
+
+void 
 HNAvahiBrowserEvent::setName( std::string value )
 {
     name = value;
@@ -361,4 +424,26 @@ HNAvahiBrowserEvent::getName()
 {
     return name;
 }
+
+void 
+HNAvahiBrowserEvent::debugPrint()
+{
+
+    if( evType == HNAB_EVTYPE_ADD )
+    {
+        printf( "ADD Service '%s' of type '%s' in domain '%s':\n", name.c_str(), type.c_str(), domain.c_str() );
+        printf( "\t%s:%u (%s)\n", hostname.c_str(), port, address.c_str() );
+        
+        for( std::map< std::string, std::string >::iterator it = txtPairs.begin(); it != txtPairs.end(); it++ )
+        {
+            printf( "\t%s = %*.*s\n", it->first.c_str(), (int) it->second.size(), (int) it->second.size(), it->second.c_str() );
+        }    
+    }
+    else if( evType == HNAB_EVTYPE_REMOVE )
+    {
+        printf( "REMOVE Service '%s' of type '%s' in domain '%s':\n", name.c_str(), type.c_str(), domain.c_str() );
+    }
+
+}
+
 

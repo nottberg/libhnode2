@@ -147,7 +147,7 @@ class HNode2TestApp : public Poco::Util::Application
             else if( _avahiBrowserTest == true )
             {
                 std::cout << "Running HNAvahiBrowser test..." << std::endl;
-                HNAvahiBrowser avObj;
+                HNAvahiBrowser avObj("_http._tcp");
 
                 // Initialize for event loop
                 int epollFD = epoll_create1( 0 );

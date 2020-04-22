@@ -221,7 +221,7 @@ HNodeDevice::start()
 
     std::cout << "Starting HNAvahi..." << std::endl;
 
-    avObj.setID( "_hnode2-rest-http._tcp", createAvahiName() );
+    avObj.setID( HNODE_DEVICE_AVAHI_TYPE, createAvahiName() );
     avObj.setPort( port );
 
     hnodeID.getStr( rstStr );    

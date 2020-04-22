@@ -6,17 +6,42 @@
 
 #include "HNSigSyncQueue.h"
 
+typedef enum HNAvahiBrowserEventType
+{
+    HNAB_EVTYPE_NOTSET,
+    HNAB_EVTYPE_ADD,
+    HNAB_EVTYPE_REMOVE
+} HNAB_EVTYPE_T; 
+
 class HNAvahiBrowserEvent
 {
     private:
-        std::string name;
+        HNAB_EVTYPE_T evType;
+        std::string   name;
+        std::string   type;
+        std::string   domain;
+
+        std::string   hostname;
+        std::string   address;
+        uint16_t      port;
+
+        std::map< std::string, std::string > txtPairs;
 
     public:
         HNAvahiBrowserEvent();
        ~HNAvahiBrowserEvent();
 
+        void clear();
+
+        void setAddEvent( std::string name, std::string type, std::string domain, std::string hostname, std::string address, uint16_t port );
+        void setRemoveEvent( std::string name, std::string type, std::string domain );
+
+        void addTxtPair( std::string key, std::string value ); 
+
         void setName( std::string value );
         std::string getName();
+
+        void debugPrint();
 };
 
 typedef enum HNAvahiBrowserErrorEnum
@@ -44,19 +69,21 @@ typedef enum HNAvahiBrowserStateEnum
 class HNAvahiBrowser
 {
     private:
-        void *client; // AvahiClient
-        void *simplePoll; // AvahiSimplePoll 
-        void *serviceBrowser; // AvahiServiceBrowser
-        void *thelp; // HNAvahiRunner
+        std::string devType;
 
         HNAVAHI_BROWSER_STATE_T state;
-        HNAVAHI_BROWSER_ERROR_T failReason;
 
+        HNAVAHI_BROWSER_ERROR_T failReason;
         std::string     failMsg;
 
         // Pass discovery related events back 
         // to caller.
         HNSigSyncQueue eventQueue;
+
+        void *client; // AvahiClient
+        void *simplePoll; // AvahiSimplePoll 
+        void *serviceBrowser; // AvahiServiceBrowser
+        void *thelp; // HNAvahiRunner
 
         static void callbackResolve( void *r, uint interface, uint protocol, uint event, 
                                      const char *name,  const char *type, const char *domain, 
@@ -78,7 +105,7 @@ class HNAvahiBrowser
         bool hasClient();
 
     public:
-        HNAvahiBrowser();
+        HNAvahiBrowser( std::string avahiType );
        ~HNAvahiBrowser();
 
         HNSigSyncQueue& getEventQueue();

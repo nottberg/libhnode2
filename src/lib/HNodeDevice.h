@@ -7,6 +7,8 @@
 #include "HNAvahi.h"
 #include "HNHttpServer.h"
 
+#define HNODE_DEVICE_AVAHI_TYPE  "_hnode2-rest-http._tcp"
+
 typedef enum HNodeDeviceResultEnum
 {
     HND_RESULT_SUCCESS,
