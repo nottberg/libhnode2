@@ -63,17 +63,23 @@ HNAvahiBrowser::~HNAvahiBrowser()
     cleanup();
 }
 
+HNSigSyncQueue& 
+HNAvahiBrowser::getEventQueue()
+{
+    return eventQueue;
+}
+
 void
 HNAvahiBrowser::cleanup()
 {
+    if( serviceBrowser )
+        avahi_service_browser_free( (AvahiServiceBrowser *) serviceBrowser );
+
     if( client )
         avahi_client_free( (AvahiClient*) client );
 
     if( simplePoll )
         avahi_simple_poll_free( (AvahiSimplePoll*) simplePoll );
-
-    if( serviceBrowser )
-        avahi_service_browser_free( (AvahiServiceBrowser *) serviceBrowser );
 
     if( thelp )
         delete ( (HNAvahiBrowserRunner*) thelp );
@@ -134,6 +140,20 @@ HNAvahiBrowser::callbackResolve( void *r, uint interface, uint protocol, uint ev
 
         case AVAHI_RESOLVER_FOUND: 
         {
+            // Allocate a Event record
+            HNAvahiBrowserEvent *event;
+            if( hnaObj->eventQueue.getReleasedCnt() )
+                event = (HNAvahiBrowserEvent*) hnaObj->eventQueue.freeRecord();
+            else
+                event = new HNAvahiBrowserEvent;
+            
+            // Fill in event data
+            event->setName( name );
+
+            // Add it to the event queue
+            hnaObj->eventQueue.postRecord( event );
+            
+#if 0
             char a[AVAHI_ADDRESS_STR_MAX], *t;
             fprintf( stderr, "Service '%s' of type '%s' in domain '%s':\n", name, type, domain );
             avahi_address_snprint( a, sizeof(a), address );
@@ -156,6 +176,7 @@ HNAvahiBrowser::callbackResolve( void *r, uint interface, uint protocol, uint ev
                     !!(flags & AVAHI_LOOKUP_RESULT_MULTICAST),
                     !!(flags & AVAHI_LOOKUP_RESULT_CACHED));
             avahi_free( t );
+#endif
         }
     }
     avahi_service_resolver_free( resolver );
@@ -232,6 +253,9 @@ HNAvahiBrowser::start()
 
     // Signal in startup
     setState( HNAVAHI_BROWSER_STATE_STARTUP );
+
+    // Init the event queue for sending back discover events.
+    eventQueue.init();
 
     // Allocate main loop object
     simplePoll = avahi_simple_poll_new();
@@ -313,5 +337,28 @@ void
 HNAvahiBrowser::killEventLoop()
 {
     avahi_simple_poll_quit( (AvahiSimplePoll*) simplePoll );
+}
+
+
+HNAvahiBrowserEvent::HNAvahiBrowserEvent()
+{
+
+}
+
+HNAvahiBrowserEvent::~HNAvahiBrowserEvent()
+{
+
+}
+
+void 
+HNAvahiBrowserEvent::setName( std::string value )
+{
+    name = value;
+}
+
+std::string 
+HNAvahiBrowserEvent::getName()
+{
+    return name;
 }
 

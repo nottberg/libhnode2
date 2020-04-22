@@ -4,6 +4,21 @@
 #include <string>
 #include <map>
 
+#include "HNSigSyncQueue.h"
+
+class HNAvahiBrowserEvent
+{
+    private:
+        std::string name;
+
+    public:
+        HNAvahiBrowserEvent();
+       ~HNAvahiBrowserEvent();
+
+        void setName( std::string value );
+        std::string getName();
+};
+
 typedef enum HNAvahiBrowserErrorEnum
 {
    HNAVAHI_BROWSER_ERR_NONE         = 0,
@@ -39,6 +54,10 @@ class HNAvahiBrowser
 
         std::string     failMsg;
 
+        // Pass discovery related events back 
+        // to caller.
+        HNSigSyncQueue eventQueue;
+
         static void callbackResolve( void *r, uint interface, uint protocol, uint event, 
                                      const char *name,  const char *type, const char *domain, 
                                      const char *host_name, const void *address, uint16_t port, 
@@ -61,6 +80,8 @@ class HNAvahiBrowser
     public:
         HNAvahiBrowser();
        ~HNAvahiBrowser();
+
+        HNSigSyncQueue& getEventQueue();
 
         void start();
         void shutdown();

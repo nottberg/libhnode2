@@ -1,25 +1,24 @@
 #include <unistd.h>
 #include <sys/eventfd.h>
 
+#include <iostream>
+
 #include "HNSigSyncQueue.h"
 
-template <class T>
-HNSigSyncQueue<T>::HNSigSyncQueue()
+HNSigSyncQueue::HNSigSyncQueue()
 {
     eventFD    = (-1);
     postCnt    = 0;
     releaseCnt = 0;
 }
 
-template <class T>
-HNSigSyncQueue<T>::~HNSigSyncQueue()
+HNSigSyncQueue::~HNSigSyncQueue()
 {
 
 }
 
-template <class T>
 bool 
-HNSigSyncQueue<T>::init()
+HNSigSyncQueue::init()
 {
     const std::lock_guard< std::mutex > lock( lm );
 
@@ -42,18 +41,16 @@ HNSigSyncQueue<T>::init()
     return false;
 }
 
-template <class T>
 int 
-HNSigSyncQueue<T>::getEventFD()
+HNSigSyncQueue::getEventFD()
 {
     const std::lock_guard< std::mutex > lock( lm );
 
     return eventFD;
 }
 
-template <class T>
 uint64_t 
-HNSigSyncQueue<T>::getPostedCnt()
+HNSigSyncQueue::getPostedCnt()
 {
    // Grab scope lock
    const std::lock_guard< std::mutex > lock( lm );
@@ -62,9 +59,8 @@ HNSigSyncQueue<T>::getPostedCnt()
    return postCnt;
 }
 
-template <class T>
 void 
-HNSigSyncQueue<T>::postRecord( T record )
+HNSigSyncQueue::postRecord( void *record )
 {
     uint64_t inc = 1;
 
@@ -72,7 +68,7 @@ HNSigSyncQueue<T>::postRecord( T record )
     const std::lock_guard< std::mutex > lock( lm );
 
     // Add new record
-    postQueue.append_back( record );
+    postQueue.push_back( record );
 
     // Account for new entry
     postCnt += 1;
@@ -86,11 +82,10 @@ HNSigSyncQueue<T>::postRecord( T record )
     }
 }
 
-template <class T>
-T 
-HNSigSyncQueue<T>::aquireRecord()
+void*
+HNSigSyncQueue::aquireRecord()
 {
-    T rtnObj;
+    void *rtnObj;
     uint64_t buf;
 
     // Grab the scope lock
@@ -98,7 +93,7 @@ HNSigSyncQueue<T>::aquireRecord()
 
     // Bounds check
     if( postCnt == 0 )
-        return rtnObj;
+        return NULL;
 
     // Read the eventFD, which will clear it to zero
     read( eventFD, &buf, sizeof(buf) ); 
@@ -114,9 +109,8 @@ HNSigSyncQueue<T>::aquireRecord()
     return rtnObj; 
 }
 
-template <class T>
 uint64_t 
-HNSigSyncQueue<T>::getReleasedCnt()
+HNSigSyncQueue::getReleasedCnt()
 {
    // Grab scope lock
    const std::lock_guard< std::mutex > lock( lm );
@@ -126,33 +120,30 @@ HNSigSyncQueue<T>::getReleasedCnt()
 }
 
 
-template <class T>
 void 
-HNSigSyncQueue<T>::releaseRecord( T record )
+HNSigSyncQueue::releaseRecord( void *record )
 {
     // Grab scope lock
     const std::lock_guard< std::mutex > lock( lm );
 
     // Add new record
-    releaseQueue.append_back( record );
+    releaseQueue.push_back( record );
 
     // Account for new entry
     releaseCnt += 1;
 }
 
-template <class T>
-T 
-HNSigSyncQueue<T>::freeRecord()
+void*
+HNSigSyncQueue::freeRecord()
 {
-    T rtnObj;
-    uint64_t buf;
+    void *rtnObj;
 
     // Grab the scope lock
     const std::lock_guard< std::mutex > lock( lm );
 
     // Bounds check
     if( releaseCnt == 0 )
-        return rtnObj;
+        return NULL;
    
     // Grab the front element from the queue
     rtnObj = releaseQueue.front();

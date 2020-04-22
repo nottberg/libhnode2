@@ -4,7 +4,6 @@
 #include <list>
 #include <mutex>
 
-template <class T>
 class HNSigSyncQueue
 {
     private:
@@ -19,8 +18,8 @@ class HNSigSyncQueue
         uint64_t releaseCnt;
 
         // The queues of elements
-        std::list< T > postQueue;
-        std::list< T > releaseQueue;
+        std::list< void* > postQueue;
+        std::list< void* > releaseQueue;
 
     public:
         HNSigSyncQueue();
@@ -31,12 +30,12 @@ class HNSigSyncQueue
         int getEventFD();
 
         uint64_t getPostedCnt();
-        void postRecord( T record );
-        T aquireRecord();
+        void postRecord( void* record );
+        void* aquireRecord();
 
         uint64_t getReleasedCnt();
-        void releaseRecord( T record );
-        T freeRecord();
+        void releaseRecord( void* record );
+        void* freeRecord();
 };
 
 #endif
