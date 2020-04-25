@@ -9,38 +9,38 @@
 #include "Poco/Net/HTTPServerRequest.h"
 #include "Poco/Net/HTTPServerResponse.h"
 
-#include "HNodeDevice.h"
+#include "HNRestHandler.h"
+
+class HNodeDevice;
 
 namespace pn = Poco::Net;
 
 // Handle the pre-defined "/hnode2/device/" requests
-class HNDeviceRestDevice: public pn::HTTPRequestHandler
+class HNDRestBuiltInHandler: public pn::HTTPRequestHandler
 {
+    private:
+        HNodeDevice     *m_parent;
+        HNOperationData *m_opData;
+
     public:
-        HNDeviceRestDevice( HNodeDevice *parent );
+        HNDRestBuiltInHandler( HNodeDevice *parent, HNOperationData *opData );
 
         void handleRequest( pn::HTTPServerRequest& request, pn::HTTPServerResponse& response );
-
-        static pn::HTTPRequestHandler *create( HNodeDevice *parent );
-
-    private:
-        HNodeDevice *_parent;
 };
 
-// Handle a "/" level request
-class HNDeviceRestRoot: public pn::HTTPRequestHandler
+class HNDRestBuiltInFactory : public HNRestHandlerFactoryInterface
 {
-    public:
-        HNDeviceRestRoot( HNodeDevice *parent );
-
-        void handleRequest( pn::HTTPServerRequest& request, pn::HTTPServerResponse& response );
-
-        static pn::HTTPRequestHandler *create( HNodeDevice *parent );
-
     private:
-        HNodeDevice *_parent;
+        HNodeDevice *m_parent;
+
+    public:
+        HNDRestBuiltInFactory( HNodeDevice *parent );
+       ~HNDRestBuiltInFactory();
+
+        virtual pn::HTTPRequestHandler* createRequestHandler( HNOperationData *opData );
 };
 
+#if 0
 // A function pointer for the handler creation routine.
 // This can then be stored in the factory lookup table.
 typedef pn::HTTPRequestHandler* (*HN_DEVHNDLR_CREATE)( HNodeDevice *parent );
@@ -60,5 +60,6 @@ class HNDeviceRestHandlerFactory: public pn::HTTPRequestHandlerFactory
 
         std::map< std::string, HN_DEVHNDLR_CREATE > uriMap;
 };
+#endif
 
 #endif // _HN_DEVICE_REST_HANDLER_H_

@@ -15,7 +15,7 @@ typedef enum HNodeDeviceResultEnum
     HND_RESULT_FAILURE
 }HND_RESULT_T;
 
-class HNodeDevice
+class HNodeDevice : public HNRestDispatchInterface
 {
     private:
         std::string  devType;
@@ -65,7 +65,7 @@ class HNodeDevice
 
         void start();
 
-
+        virtual void restDispatch( HNOperationData *opData );
 };
 
 #endif // __HNODE_DEVICE_H__

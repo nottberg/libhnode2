@@ -19,17 +19,17 @@ ADD_DEFINITIONS( -DVERSION=${VERSION} )
 FIND_PACKAGE( Poco REQUIRED Foundation Net NetSSL JSON )
 
 SET( HNODE2_LIB_SRC ${CMAKE_SOURCE_DIR}/src/lib/HNHttpServer.cpp 
-                    ${CMAKE_SOURCE_DIR}/src/lib/HNRootHandler.cpp
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNRestHandler.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNSigSyncQueue.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNAvahi.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNAvahiBrowser.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNodeID.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNodeConfig.cpp
-                    ${CMAKE_SOURCE_DIR}/src/lib/HNDeviceRestHandler.cpp
+                    #${CMAKE_SOURCE_DIR}/src/lib/HNDeviceRestHandler.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNodeDevice.cpp )
 
 SET( HNODE2_LIB_HDR ${CMAKE_SOURCE_DIR}/src/lib/HNHttpServer.h 
-                    ${CMAKE_SOURCE_DIR}/src/lib/HNRootHandler.h
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNRestHandler.h
                     ${CMAKE_SOURCE_DIR}/src/lib/HNSigSyncQueue.h
                     ${CMAKE_SOURCE_DIR}/src/lib/HNAvahi.h
                     ${CMAKE_SOURCE_DIR}/src/lib/HNAvahiBrowser.h

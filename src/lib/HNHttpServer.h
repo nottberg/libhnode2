@@ -8,8 +8,8 @@
 
 //using Poco::Util::OptionSet;
 
-// Forward declaration for back pointer
-class HNodeDevice;
+#include "HNRestHandler.h"
+//#include "HNDeviceRestHandler.h"
 
 class HNHttpServer
 {
@@ -17,11 +17,12 @@ class HNHttpServer
         HNHttpServer();
        ~HNHttpServer();
 
-        void start( HNodeDevice *parent );
+        void start( HNRestDispatchInterface *dispatchInf );
 
     private:
-        uint16_t  port;
-        void     *srvPtr;
+        uint16_t  m_port;
+      
+        void     *m_srvPtr;
 };
 
 #endif

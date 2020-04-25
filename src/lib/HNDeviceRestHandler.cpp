@@ -7,14 +7,14 @@
 namespace pjs = Poco::JSON;
 namespace pdy = Poco::Dynamic;
 
-HNDeviceRestDevice::HNDeviceRestDevice( HNodeDevice *parent )
-: _parent( parent )
+HNDRestBuiltInHandler::HNDRestBuiltInHandler( HNodeDevice *parent, HNOperationData *opData )
+: m_parent( parent ), m_opData( opData )
 {
 
 }
 
 void 
-HNDeviceRestDevice::handleRequest( pn::HTTPServerRequest& request, pn::HTTPServerResponse& response )
+HNDRestBuiltInHandler::handleRequest( pn::HTTPServerRequest& request, pn::HTTPServerResponse& response )
 {
     std::vector< std::string > pSegs;
     Poco::URI uri( request.getURI() );
@@ -31,23 +31,23 @@ HNDeviceRestDevice::handleRequest( pn::HTTPServerRequest& request, pn::HTTPServe
             response.setChunkedTransferEncoding(true);
             response.setContentType("application/json");
 
-            jsRoot.set( "hnodeID", _parent->getHNodeIDStr() );
-            jsRoot.set( "crc32ID", _parent->getHNodeIDCRC32Str() );
+            jsRoot.set( "hnodeID", m_parent->getHNodeIDStr() );
+            jsRoot.set( "crc32ID", m_parent->getHNodeIDCRC32Str() );
  
-            jsRoot.set( "name", _parent->getName() );
+            jsRoot.set( "name", m_parent->getName() );
 
-            jsRoot.set( "instance", _parent->getInstance() );
+            jsRoot.set( "instance", m_parent->getInstance() );
 
-            jsRoot.set( "deviceType", _parent->getDeviceType() );
-            jsRoot.set( "version", _parent->getVersionStr() );
+            jsRoot.set( "deviceType", m_parent->getDeviceType() );
+            jsRoot.set( "version", m_parent->getVersionStr() );
         }
         else if( "owner" == pSegs.back() )
         {
             response.setChunkedTransferEncoding(true);
             response.setContentType("application/json");
 
-            jsRoot.set( "state", _parent->getOwnerState() );
-            jsRoot.set( "hnodeID", _parent->getOwnerHNodeIDStr() );
+            jsRoot.set( "state", m_parent->getOwnerState() );
+            jsRoot.set( "hnodeID", m_parent->getOwnerHNodeIDStr() );
         }
         else
         {
@@ -69,8 +69,6 @@ HNDeviceRestDevice::handleRequest( pn::HTTPServerRequest& request, pn::HTTPServe
             return;
         }
 
-
-
     }
     else
     {
@@ -80,6 +78,7 @@ HNDeviceRestDevice::handleRequest( pn::HTTPServerRequest& request, pn::HTTPServe
     }
 }
 
+#if 0
 pn::HTTPRequestHandler* 
 HNDeviceRestDevice::create( HNodeDevice *parent )
 {
@@ -108,13 +107,26 @@ HNDeviceRestRoot::handleRequest( pn::HTTPServerRequest& request, pn::HTTPServerR
     std::ostream& ostr = response.send();
     ostr << "<html><body><h2>This is a hnode2 device</h2></body></html>";
 }
+#endif
 
-pn::HTTPRequestHandler* 
-HNDeviceRestRoot::create( HNodeDevice *parent )
+HNDeviceBuiltInFactory::HNDeviceBuiltInFactory( HNodeDevice *parent )
+: m_parent( parent )
 {
-    return new HNDeviceRestRoot( parent );
+
 }
 
+HNDeviceBuiltInFactory::~HNDeviceBuiltInFactory()
+{
+
+}
+
+pn::HTTPRequestHandler* 
+HNDeviceBuiltInFactory::createRequestHandler( HNOperationData *opData )
+{
+    return new HNDRestBuiltInHandler( m_parent, opData );
+}
+
+#if 0
 HNDeviceRestHandlerFactory::HNDeviceRestHandlerFactory( HNodeDevice *parent )
 : _parent( parent )
 {
@@ -151,4 +163,4 @@ HNDeviceRestHandlerFactory::createRequestHandler( const pn::HTTPServerRequest& r
     // Found, call the create function
     return (it->second)( _parent );
 }
-
+#endif

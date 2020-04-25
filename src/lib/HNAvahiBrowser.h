@@ -39,7 +39,11 @@ class HNAvahiBrowserEvent
         void addTxtPair( std::string key, std::string value ); 
 
         void setName( std::string value );
+
+        HNAB_EVTYPE_T getEventType();
         std::string getName();
+
+        std::string getTxtValue( std::string key );
 
         void debugPrint();
 };

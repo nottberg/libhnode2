@@ -1,31 +1,16 @@
-#if 0
-#include "Poco/Net/HTTPServer.h"
-#include "Poco/Net/HTTPRequestHandler.h"
-#include "Poco/Net/HTTPRequestHandlerFactory.h"
-#include "Poco/Net/HTTPServerParams.h"
-#include "Poco/Net/HTTPServerRequest.h"
-#include "Poco/Net/HTTPServerResponse.h"
-#include "Poco/Net/HTTPServerParams.h"
-#include "Poco/Net/ServerSocket.h"
-#include "Poco/Timestamp.h"
-#include "Poco/DateTimeFormatter.h"
-#include "Poco/DateTimeFormat.h"
-#include "Poco/Exception.h"
-#include "Poco/ThreadPool.h"
-#include "Poco/Util/ServerApplication.h"
-#include "Poco/Util/Option.h"
-#include "Poco/Util/OptionSet.h"
-#include "Poco/Util/HelpFormatter.h"
-#endif
-
 #include <iostream>
+
+#include <Poco/JSON/Object.h>
+#include <Poco/JSON/Parser.h>
 
 #include "Poco/String.h"
 
 #include "HNAvahi.h"
-//#include "HNRootHandler.h"
 #include "HNodeConfig.h"
 #include "HNodeDevice.h"
+
+namespace pjs = Poco::JSON;
+namespace pdy = Poco::Dynamic;
 
 HNodeDevice::HNodeDevice( std::string deviceType, std::string instance )
 {
@@ -228,6 +213,7 @@ HNodeDevice::start()
     avObj.setSrvPair( "hnodeID", rstStr );
     avObj.setSrvPair( "crc32ID", hnodeID.getCRC32AsHexStr() );
     avObj.setSrvPair( "name", getName() );
+    avObj.setSrvPair( "devType", devType );
 
     avObj.start();
 
@@ -235,3 +221,77 @@ HNodeDevice::start()
 
     rest.start( this );
 }
+
+void 
+HNodeDevice::restDispatch( HNOperationData *opData )
+{
+    std::cout << "HNodeDevice::restDispatch() - entry" << std::endl;
+    std::cout << "  dispatchID: " << opData->getDispatchID() << std::endl;
+    std::cout << "  opID: " << opData->getOpID() << std::endl;
+
+    if( opData->getDispatchID() != "hnode2Dev" )
+    {
+        // Dispatch this further
+        return;
+    }
+
+    std::string opID = opData->getOpID();
+
+    if( "getDeviceInfo" == opID )
+    {
+        // Create a json root object
+        pjs::Object jsRoot;
+
+        opData->responseSetChunkedTransferEncoding(true);
+        opData->responseSetContentType("application/json");
+
+        jsRoot.set( "hnodeID", getHNodeIDStr() );
+        jsRoot.set( "crc32ID", getHNodeIDCRC32Str() );
+ 
+        jsRoot.set( "name", getName() );
+
+        jsRoot.set( "instance", getInstance() );
+
+        jsRoot.set( "deviceType", getDeviceType() );
+        jsRoot.set( "version", getVersionStr() );
+
+        // Render the response
+        std::ostream& ostr = opData->responseSend();
+        try
+        {
+            // Write out the generated json
+            pjs::Stringifier::stringify( jsRoot, ostr, 1 );
+        }
+        catch( ... )
+        {
+            opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
+            return;
+        }
+    }
+    else if( "getDeviceOwner" == opID )
+    {
+        // Create a json root object
+        pjs::Object jsRoot;
+
+        opData->responseSetChunkedTransferEncoding(true);
+        opData->responseSetContentType("application/json");
+
+        jsRoot.set( "state", getOwnerState() );
+        jsRoot.set( "hnodeID", getOwnerHNodeIDStr() );
+
+        // Render the response
+        std::ostream& ostr = opData->responseSend();
+        try
+        {
+            // Write out the generated json
+            pjs::Stringifier::stringify( jsRoot, ostr, 1 );
+        }
+        catch( ... )
+        {
+            opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
+            return;
+        }
+    }
+    
+}
+

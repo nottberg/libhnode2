@@ -419,10 +419,29 @@ HNAvahiBrowserEvent::setName( std::string value )
     name = value;
 }
 
+HNAB_EVTYPE_T 
+HNAvahiBrowserEvent::getEventType()
+{
+    return evType;
+}
+
 std::string 
 HNAvahiBrowserEvent::getName()
 {
     return name;
+}
+
+std::string 
+HNAvahiBrowserEvent::getTxtValue( std::string key )
+{
+    std::string empty;
+
+    std::map< std::string, std::string >::iterator it = txtPairs.find( key );
+
+    if( it == txtPairs.end() )
+        return empty;
+
+    return it->second;    
 }
 
 void 
