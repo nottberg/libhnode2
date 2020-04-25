@@ -77,6 +77,7 @@ class HNRestPathElement
 class HNRestPath
 {
     private:
+        std::string m_method;
         std::vector< HNRestPathElement > m_elements;
 
         std::string m_dispatchID;
@@ -89,26 +90,13 @@ class HNRestPath
 
         void init( std::string dispatchID, std::string operationID, HNRestDispatchInterface *dispatch );
 
+        void setMethod( std::string value );
+
         std::string getOpID();
 
         void addPathElement( HNRPE_TYPE_T type, std::string value );
 
         HNOperationData* checkForHandler( std::string httpMethod, std::vector< std::string > &urlStrs );
 };
-
-#if 0
-class HNRestHandlerFactory: public pn::HTTPRequestHandlerFactory
-{
-    public:
-        HNRestHandlerFactory();
-
-        HNRestPath *addPath( std::string opID, HNRestHandlerFactoryInterface *factory );
-
-        pn::HTTPRequestHandler* createRequestHandler( const pn::HTTPServerRequest& request );
-
-    private:
-        std::vector< HNRestPath > pathList;
-};
-#endif
 
 #endif // _H_HN_REST_HANDLER_H_

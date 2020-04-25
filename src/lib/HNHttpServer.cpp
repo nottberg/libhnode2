@@ -89,7 +89,6 @@ pn::HTTPRequestHandler*
 HNRestHandlerFactory::createRequestHandler( const pn::HTTPServerRequest& request )
 {
     HNOperationData *opData = NULL;
-    std::string method;
     std::vector< std::string > pathStrs;
 
     Poco::URI uri( request.getURI() );    
@@ -106,7 +105,7 @@ HNRestHandlerFactory::createRequestHandler( const pn::HTTPServerRequest& request
     for( std::vector< HNRestPath >::iterator it = pathList.begin(); it != pathList.end(); it++ )
     {
         std::cout << "Check handler: " << it->getOpID() << std::endl;
-        opData = it->checkForHandler( method, pathStrs );
+        opData = it->checkForHandler( request.getMethod(), pathStrs );
         if( opData != NULL )
             return new HNRestHandler( opData );
     }
@@ -138,101 +137,77 @@ HNHttpServer::registerEndpointsFromOpenAPI( std::string dispatchID, HNRestDispat
     // Invoke the json parser
     try
     {
-        // Attempt to parse the json    
+        // Attempt to parse the provided openAPI input
         pjs::Parser parser;
         pdy::Var varRoot = parser.parse( openAPIJson );
 
         // Get a pointer to the root object
         pjs::Object::Ptr jsRoot = varRoot.extract< pjs::Object::Ptr >();
 
+        // Make sure the "paths" field exists, otherwise nothing to do
         if( jsRoot->isObject( "paths" ) == false )
             return;
 
         // Extract the paths object
         pjs::Object::Ptr jsPathList = jsRoot->getObject( "paths" );
 
-        // Iterate through the fields, each one represents a path
+        // Iterate through the fields, each field represents a path
         for( pjs::Object::ConstIterator pit = jsPathList->begin(); pit != jsPathList->end(); pit++ )
         {
-            Poco::URI uri( pit->first );
             std::vector< std::string > pathStrs;
 
+            // Parse the extracted uri
+            Poco::URI uri( pit->first );
+
+            // Break it into tokens by '/'
             uri.getPathSegments( pathStrs );
 
             std::cout << "regend - uri: " << uri.toString() << std::endl;
             std::cout << "regend - segcnt: " << pathStrs.size() << std::endl;
 
+            // Turn the iterator into a object pointer
             pjs::Object::Ptr jsPath = pit->second.extract< pjs::Object::Ptr >();
 
-            // Iterate through the fields, each one represents a supported HTTP Method
+            // Iterate through the fields, each field represents a supported HTTP Method
             for( pjs::Object::ConstIterator mit = jsPath->begin(); mit != jsPath->end(); mit++ )
             {
                 std::cout << "regend - method: " << mit->first << std::endl;
 
+                // Get a pointer to the method object
                 pjs::Object::Ptr jsMethod = mit->second.extract< pjs::Object::Ptr >();
 
+                // The method object must contain a operationID field
+                // which will be used by the dispatch Callback to know
+                // the request that was made.
                 std::string opID = jsMethod->getValue< std::string >( "operationId" );
                 std::cout << "regend - opID: " << opID << std::endl;
 
+                // We have everything we need so now the new path can be added to the 
+                // http factory class
                 path = ((HNRestHandlerFactory *) m_facPtr)->addPath( dispatchID, opID,  dispatchInf );
-             
+
+                // Record the method for this specific path record
+                path->setMethod( mit->first );
+
+                // Build up the path element array, taking into account url based parameters
                 for( std::vector< std::string >::iterator sit = pathStrs.begin(); sit != pathStrs.end(); sit++ )
                 {
-                    path->addPathElement( HNRPE_TYPE_PATH, *sit );
-                } 
-            }
-
-
-#if 0
-                HNCSection *secPtr;
-                config.updateSection( it->first, &secPtr );
-
-                pjs::Object::Ptr jsSec = it->second.extract< pjs::Object::Ptr >();
-
-                for( pjs::Object::ConstIterator sit = jsSec->begin(); sit != jsSec->end(); sit++ )
-                {
-
-                    if( sit->second.isString() == true )
-                    {    
-                        secPtr->updateValue( sit->first, sit->second.extract< std::string >() ); 
-                    }
-                    else if( jsSec->isArray( sit ) == true )
+                    std::cout << "PathComp: " << *sit << std::endl;
+                    // Check if this is a parameter or a regular path element.
+                    if( (sit->front() = '{') && (sit->back() == '}') )
                     {
-                        HNCObjList *listPtr;
-                        secPtr->updateList( sit->first, &listPtr );
-
-                        pjs::Array::Ptr jsArr = jsSec->getArray( sit->first );
-                  
-                        uint index = 0;
-                        for( uint index = 0; index < jsArr->size(); index++ )
-                        {
-                            if( jsArr->isObject( index ) == true )
-                            {
-                                pjs::Object::Ptr jsAObj = jsArr->getObject( index );
-
-                                HNCObj *aobjPtr;
-                                listPtr->appendObj( &aobjPtr );
-
-                                for( pjs::Object::ConstIterator aoit = jsAObj->begin(); aoit != jsAObj->end(); aoit++ )
-                                {
-                                    if( aoit->second.isString() == true )
-                                    {    
-                                        aobjPtr->updateValue( aoit->first, aoit->second.extract< std::string >() ); 
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                // Unrecognized config element at array layer
-                            }
-                        }
+                        // Add a parameter capture
+                        std::string paramName( (sit->begin() + 1), (sit->end() - 1) );
+                        std::cout << "regend - paramName: " << paramName << std::endl;
+                        path->addPathElement( HNRPE_TYPE_PARAM, paramName );
                     }
                     else
                     {
-                        // Unrecognized config element at section layer.  Log? Error?
+                        // Add a regular path element
+                        path->addPathElement( HNRPE_TYPE_PATH, *sit );
                     }
-                }
-#endif
+                } 
+            }
         }
 
     }
@@ -242,17 +217,6 @@ HNHttpServer::registerEndpointsFromOpenAPI( std::string dispatchID, HNRestDispat
         return;
     }
 
-#if 0
-    path = ((HNRestHandlerFactory *) m_facPtr)->addPath( dispatchID, "getDeviceInfo",  dispatchInf );
-    path->addPathElement( HNRPE_TYPE_PATH, "hnode2" );
-    path->addPathElement( HNRPE_TYPE_PATH, "device" );
-    path->addPathElement( HNRPE_TYPE_PATH, "info" );
-
-    path = ((HNRestHandlerFactory *) m_facPtr)->addPath( dispatchID, "getDeviceOwner", dispatchInf );
-    path->addPathElement( HNRPE_TYPE_PATH, "hnode2" );
-    path->addPathElement( HNRPE_TYPE_PATH, "device" );
-    path->addPathElement( HNRPE_TYPE_PATH, "owner" );
-#endif
 }
 
 void

@@ -126,6 +126,16 @@ HNRestPath::init( std::string dispatchID, std::string operationID, HNRestDispatc
     m_dispatchInf = dispatch;
 }
 
+void 
+HNRestPath::setMethod( std::string value )
+{
+   // Transform the string to uppercase
+   std::transform( value.begin(), value.end(), value.begin(), ::toupper);
+
+   // Save it
+   m_method = value;
+}
+
 std::string 
 HNRestPath::getOpID()
 {
@@ -152,7 +162,14 @@ HNRestPath::checkForHandler( std::string httpMethod, std::vector< std::string > 
     }
 
     // If the request type is wrong then move on
-
+    // Always use upper case for method names
+    std::transform( httpMethod.begin(), httpMethod.end(), httpMethod.begin(), ::toupper);
+    std::cout << "Method compare: " << m_method << " " << httpMethod << std::endl;
+    if( m_method != httpMethod )
+    {
+        printf( "Methods don't match\n" );
+        return NULL;
+    }
 
     // Start parsing and collecting parameters
     HNOperationData *opData = new HNOperationData( m_dispatchID, m_opID, m_dispatchInf );
