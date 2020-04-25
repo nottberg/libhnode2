@@ -2,14 +2,8 @@
 #define _HN_HTTP_SERVER_H_
 
 #include <string>
-//#include "Poco/Util/ServerApplication.h"
-//#include "Poco/Net/HTTPRequestHandlerFactory.h"
-//#include "Poco/Util/OptionSet.h"
-
-//using Poco::Util::OptionSet;
 
 #include "HNRestHandler.h"
-//#include "HNDeviceRestHandler.h"
 
 class HNHttpServer
 {
@@ -17,12 +11,16 @@ class HNHttpServer
         HNHttpServer();
        ~HNHttpServer();
 
-        void start( HNRestDispatchInterface *dispatchInf );
+        void registerEndpointsFromOpenAPI( std::string dispatchID, HNRestDispatchInterface *dispatchInf, std::string openAPIJson );
+
+        void start();
 
     private:
-        uint16_t  m_port;
-      
-        void     *m_srvPtr;
+        uint16_t m_port;
+
+        void *m_facPtr;
+
+        void *m_srvPtr;
 };
 
 #endif

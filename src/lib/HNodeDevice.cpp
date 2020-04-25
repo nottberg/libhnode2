@@ -12,6 +12,85 @@
 namespace pjs = Poco::JSON;
 namespace pdy = Poco::Dynamic;
 
+const std::string g_HNode2DeviceRest = R"(
+{
+  "openapi": "3.0.0",
+  "info": {
+    "description": "",
+    "version": "1.0.0",
+    "title": ""
+  },
+  "paths": {
+    "/hnode2/device/info": {
+      "get": {
+        "summary": "Get basic information about the device.",
+        "operationId": "getDeviceInfo",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      }
+    },
+
+    "/hnode2/device/owner": {
+      "get": {
+        "summary": "Get information about the owner of this device.",
+        "operationId": "getDeviceOwner",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      }
+    },
+
+    "/hnode2/device/endpoint/{epIndx}": {
+      "get": {
+        "summary": "Get information for a specific endpoint.",
+        "operationId": "getSpecificEndpoint",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      }
+    }
+
+  }
+}
+)";
+
 HNodeDevice::HNodeDevice( std::string deviceType, std::string instance )
 {
     devType     = deviceType;
@@ -219,7 +298,8 @@ HNodeDevice::start()
 
     std::cout << "Started HNAvahi..." << std::endl;
 
-    rest.start( this );
+    rest.registerEndpointsFromOpenAPI( "hnode2Dev", this, g_HNode2DeviceRest );
+    rest.start();
 }
 
 void 

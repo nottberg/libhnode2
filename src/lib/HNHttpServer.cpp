@@ -1,30 +1,21 @@
+#include <iostream>
+
 #include "Poco/Net/HTTPServer.h"
 #include "Poco/Net/HTTPRequestHandler.h"
 #include "Poco/Net/HTTPRequestHandlerFactory.h"
 #include "Poco/Net/HTTPServerParams.h"
 #include "Poco/Net/HTTPServerRequest.h"
 #include "Poco/Net/HTTPServerResponse.h"
-//#include "Poco/Net/HTTPServerParams.h"
 #include "Poco/Net/ServerSocket.h"
 #include "Poco/URI.h"
-#if 0
-#include "Poco/Timestamp.h"
-#include "Poco/DateTimeFormatter.h"
-#include "Poco/DateTimeFormat.h"
-#include "Poco/Exception.h"
-#include "Poco/ThreadPool.h"
-#include "Poco/Util/ServerApplication.h"
-#include "Poco/Util/Option.h"
-#include "Poco/Util/OptionSet.h"
-#include "Poco/Util/HelpFormatter.h"
-#endif
-#include <iostream>
-
 #include "Poco/String.h"
+#include <Poco/JSON/Object.h>
+#include <Poco/JSON/Parser.h>
 
-//#include "HNDeviceRestHandler.h"
 #include "HNHttpServer.h"
 
+namespace pjs = Poco::JSON;
+namespace pdy = Poco::Dynamic;
 namespace pn = Poco::Net;
 
 // Define these locally so it is not in the header file.
@@ -125,16 +116,12 @@ HNRestHandlerFactory::createRequestHandler( const pn::HTTPServerRequest& request
 }
 
 
-
-
-
-
-
 HNHttpServer::HNHttpServer()
 {
     m_port   = 8080;
     m_srvPtr = NULL;
 
+    m_facPtr = new HNRestHandlerFactory();
 }
 
 HNHttpServer::~HNHttpServer()
@@ -144,31 +131,138 @@ HNHttpServer::~HNHttpServer()
 }
 
 void
-HNHttpServer::start( HNRestDispatchInterface *dispatchInf )
+HNHttpServer::registerEndpointsFromOpenAPI( std::string dispatchID, HNRestDispatchInterface *dispatchInf, std::string openAPIJson )
+{
+    HNRestPath *path;
+
+    // Invoke the json parser
+    try
+    {
+        // Attempt to parse the json    
+        pjs::Parser parser;
+        pdy::Var varRoot = parser.parse( openAPIJson );
+
+        // Get a pointer to the root object
+        pjs::Object::Ptr jsRoot = varRoot.extract< pjs::Object::Ptr >();
+
+        if( jsRoot->isObject( "paths" ) == false )
+            return;
+
+        // Extract the paths object
+        pjs::Object::Ptr jsPathList = jsRoot->getObject( "paths" );
+
+        // Iterate through the fields, each one represents a path
+        for( pjs::Object::ConstIterator pit = jsPathList->begin(); pit != jsPathList->end(); pit++ )
+        {
+            Poco::URI uri( pit->first );
+            std::vector< std::string > pathStrs;
+
+            uri.getPathSegments( pathStrs );
+
+            std::cout << "regend - uri: " << uri.toString() << std::endl;
+            std::cout << "regend - segcnt: " << pathStrs.size() << std::endl;
+
+            pjs::Object::Ptr jsPath = pit->second.extract< pjs::Object::Ptr >();
+
+            // Iterate through the fields, each one represents a supported HTTP Method
+            for( pjs::Object::ConstIterator mit = jsPath->begin(); mit != jsPath->end(); mit++ )
+            {
+                std::cout << "regend - method: " << mit->first << std::endl;
+
+                pjs::Object::Ptr jsMethod = mit->second.extract< pjs::Object::Ptr >();
+
+                std::string opID = jsMethod->getValue< std::string >( "operationId" );
+                std::cout << "regend - opID: " << opID << std::endl;
+
+                path = ((HNRestHandlerFactory *) m_facPtr)->addPath( dispatchID, opID,  dispatchInf );
+             
+                for( std::vector< std::string >::iterator sit = pathStrs.begin(); sit != pathStrs.end(); sit++ )
+                {
+                    path->addPathElement( HNRPE_TYPE_PATH, *sit );
+                } 
+            }
+
+
+#if 0
+                HNCSection *secPtr;
+                config.updateSection( it->first, &secPtr );
+
+                pjs::Object::Ptr jsSec = it->second.extract< pjs::Object::Ptr >();
+
+                for( pjs::Object::ConstIterator sit = jsSec->begin(); sit != jsSec->end(); sit++ )
+                {
+
+                    if( sit->second.isString() == true )
+                    {    
+                        secPtr->updateValue( sit->first, sit->second.extract< std::string >() ); 
+                    }
+                    else if( jsSec->isArray( sit ) == true )
+                    {
+                        HNCObjList *listPtr;
+                        secPtr->updateList( sit->first, &listPtr );
+
+                        pjs::Array::Ptr jsArr = jsSec->getArray( sit->first );
+                  
+                        uint index = 0;
+                        for( uint index = 0; index < jsArr->size(); index++ )
+                        {
+                            if( jsArr->isObject( index ) == true )
+                            {
+                                pjs::Object::Ptr jsAObj = jsArr->getObject( index );
+
+                                HNCObj *aobjPtr;
+                                listPtr->appendObj( &aobjPtr );
+
+                                for( pjs::Object::ConstIterator aoit = jsAObj->begin(); aoit != jsAObj->end(); aoit++ )
+                                {
+                                    if( aoit->second.isString() == true )
+                                    {    
+                                        aobjPtr->updateValue( aoit->first, aoit->second.extract< std::string >() ); 
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // Unrecognized config element at array layer
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Unrecognized config element at section layer.  Log? Error?
+                    }
+                }
+#endif
+        }
+
+    }
+    catch( Poco::Exception ex )
+    {
+        std::cerr << "registerEndpointsFromOpenAPI - json error: " << ex.displayText() << std::endl;
+        return;
+    }
+
+#if 0
+    path = ((HNRestHandlerFactory *) m_facPtr)->addPath( dispatchID, "getDeviceInfo",  dispatchInf );
+    path->addPathElement( HNRPE_TYPE_PATH, "hnode2" );
+    path->addPathElement( HNRPE_TYPE_PATH, "device" );
+    path->addPathElement( HNRPE_TYPE_PATH, "info" );
+
+    path = ((HNRestHandlerFactory *) m_facPtr)->addPath( dispatchID, "getDeviceOwner", dispatchInf );
+    path->addPathElement( HNRPE_TYPE_PATH, "hnode2" );
+    path->addPathElement( HNRPE_TYPE_PATH, "device" );
+    path->addPathElement( HNRPE_TYPE_PATH, "owner" );
+#endif
+}
+
+void
+HNHttpServer::start()
 {
     std::cout << "Starting HttpServer..." << std::endl;
 
     pn::ServerSocket svs( m_port );
 
-    HNRestPath *path;
-
-    HNRestHandlerFactory *m_facPtr = new HNRestHandlerFactory();
-
-    path = m_facPtr->addPath( "hnode2Dev", "getDeviceInfo",  dispatchInf );
-    path->addPathElement( HNRPE_TYPE_PATH, "hnode2" );
-    path->addPathElement( HNRPE_TYPE_PATH, "device" );
-    path->addPathElement( HNRPE_TYPE_PATH, "info" );
-
-    path = m_facPtr->addPath( "hnode2Dev", "getDeviceOwner", dispatchInf );
-    path->addPathElement( HNRPE_TYPE_PATH, "hnode2" );
-    path->addPathElement( HNRPE_TYPE_PATH, "device" );
-    path->addPathElement( HNRPE_TYPE_PATH, "owner" );
-
-    //facPtr->registerURI( "/", HNDeviceRestRoot::create );
-    //facPtr->registerURI( "/hnode2/device/info", HNDeviceRestDevice::create );
-    //facPtr->registerURI( "/hnode2/device/owner", HNDeviceRestDevice::create );
-
-    m_srvPtr = (void *) new pn::HTTPServer( m_facPtr, svs, new pn::HTTPServerParams );
+    m_srvPtr = (void *) new pn::HTTPServer( ((HNRestHandlerFactory *) m_facPtr), svs, new pn::HTTPServerParams );
     ((pn::HTTPServer*)m_srvPtr)->start();
     
      std::cout << "Started HttpServer..." << std::endl; 
