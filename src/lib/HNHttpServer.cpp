@@ -35,6 +35,7 @@ class HNRestHandler: public pn::HTTPRequestHandler
 
     public:
         HNRestHandler( HNOperationData *operationData );
+       ~HNRestHandler();
 
         void handleRequest( pn::HTTPServerRequest& request, pn::HTTPServerResponse& response );
 };
@@ -43,6 +44,12 @@ HNRestHandler::HNRestHandler( HNOperationData *operationData )
 :m_opData( operationData )
 {
 
+}
+
+HNRestHandler::~HNRestHandler()
+{
+    std::cout << "HNRestHandler - deconstruct" << std::endl;
+    delete m_opData;
 }
 
 void
