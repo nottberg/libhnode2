@@ -194,7 +194,7 @@ HNHttpServer::registerEndpointsFromOpenAPI( std::string dispatchID, HNRestDispat
                 {
                     std::cout << "PathComp: " << *sit << std::endl;
                     // Check if this is a parameter or a regular path element.
-                    if( (sit->front() = '{') && (sit->back() == '}') )
+                    if( (sit->front() == '{') && (sit->back() == '}') )
                     {
                         // Add a parameter capture
                         std::string paramName( (sit->begin() + 1), (sit->end() - 1) );

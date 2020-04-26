@@ -91,6 +91,47 @@ const std::string g_HNode2DeviceRest = R"(
 }
 )";
 
+
+HNDEndpoint::HNDEndpoint()
+{
+    m_dispatchInf = NULL;
+}
+
+HNDEndpoint::~HNDEndpoint()
+{
+}
+
+void 
+HNDEndpoint::setDispatch( std::string dispatchID, HNDEPDispatchInf *dispatchInf )
+{
+    m_dispatchID  = dispatchID;
+    m_dispatchInf = dispatchInf;
+}
+
+void 
+HNDEndpoint::setOpenAPIJson( std::string OPAJson )
+{
+    m_OpenAPI = OPAJson;
+}
+
+std::string 
+HNDEndpoint::getDispatchID()
+{
+    return m_dispatchID;
+}
+
+HNDEPDispatchInf *
+HNDEndpoint::getDispatchPtr()
+{
+    return m_dispatchInf;
+}
+
+std::string 
+HNDEndpoint::getOpenAPIJson()
+{
+    return m_OpenAPI;
+}
+
 HNodeDevice::HNodeDevice( std::string deviceType, std::string instance )
 {
     devType     = deviceType;
@@ -266,6 +307,17 @@ HNodeDevice::initToDefaults()
     setName( "Name" );
 }
 
+
+HND_RESULT_T 
+HNodeDevice::addEndpoint( HNDEndpoint newEP )
+{
+    endpointMap.insert( std::pair< std::string, HNDEndpoint >( newEP.getDispatchID(), newEP ) );
+
+    rest.registerEndpointsFromOpenAPI( newEP.getDispatchID(), this, newEP.getOpenAPIJson() );
+
+    return HND_RESULT_SUCCESS;
+}
+
 void
 HNodeDevice::start()
 {
@@ -298,22 +350,22 @@ HNodeDevice::start()
 
     std::cout << "Started HNAvahi..." << std::endl;
 
-    rest.registerEndpointsFromOpenAPI( "hnode2Dev", this, g_HNode2DeviceRest );
+    HNDEndpoint hndEP;
+
+    hndEP.setDispatch( "hnode2Dev", this );
+    hndEP.setOpenAPIJson( g_HNode2DeviceRest ); 
+
+    addEndpoint( hndEP );
+
     rest.start();
 }
 
 void 
-HNodeDevice::restDispatch( HNOperationData *opData )
+HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
 {
-    std::cout << "HNodeDevice::restDispatch() - entry" << std::endl;
+    std::cout << "HNodeDevice::dispatchEP() - entry" << std::endl;
     std::cout << "  dispatchID: " << opData->getDispatchID() << std::endl;
     std::cout << "  opID: " << opData->getOpID() << std::endl;
-
-    if( opData->getDispatchID() != "hnode2Dev" )
-    {
-        // Dispatch this further
-        return;
-    }
 
     std::string opID = opData->getOpID();
 
@@ -372,6 +424,30 @@ HNodeDevice::restDispatch( HNOperationData *opData )
             return;
         }
     }
-    
+    else
+    {
+        // Send back not implemented
+
+    }
+}
+
+void 
+HNodeDevice::restDispatch( HNOperationData *opData )
+{
+    std::cout << "HNodeDevice::restDispatch() - entry" << std::endl;
+    std::cout << "  dispatchID: " << opData->getDispatchID() << std::endl;
+
+    // Find the dispatch destination
+    std::map< std::string, HNDEndpoint >::iterator it = endpointMap.find( opData->getDispatchID() );
+
+    // No endpoint found?
+    if( it == endpointMap.end() )
+    {
+        // Respond not implemented
+        return;
+    }
+
+    // Pass along to the appropriate endpoint
+    it->second.getDispatchPtr()->dispatchEP( this, opData );
 }
 

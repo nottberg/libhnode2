@@ -145,6 +145,7 @@ HNRestPath::getOpID()
 void 
 HNRestPath::addPathElement( HNRPE_TYPE_T type, std::string value )
 {
+    std::cout << "addPathElement - type: " << type << "  value: " << value << std::endl;
     HNRestPathElement npe( type, value );
     m_elements.push_back( npe );
 }
