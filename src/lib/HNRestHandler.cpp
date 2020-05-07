@@ -3,7 +3,6 @@
 #include "Poco/Net/HTTPServerRequest.h"
 #include "Poco/Net/HTTPServerResponse.h"
 
-
 #include "HNRestHandler.h"
 
 namespace pn = Poco::Net;
@@ -199,47 +198,4 @@ HNRestPath::checkForHandler( std::string httpMethod, std::vector< std::string > 
 
     return opData;
 }
-
-#if 0
-HNRestHandlerFactory::HNRestHandlerFactory()
-{
-}
-
-HNRestPath*
-HNRestHandlerFactory::addPath( std::string opID, HNRestHandlerFactoryInterface *factory )
-{
-    HNRestPath newPath;
-    HNRestPath *pathPtr;
-
-    // Add new element
-    pathList.push_back( newPath );
-
-    // Get pointer
-    pathPtr = &pathList.back();
-    
-    pathPtr->init( opID, factory );
-
-    return pathPtr;
-}
-
-pn::HTTPRequestHandler* 
-HNRestHandlerFactory::createRequestHandler(const pn::HTTPServerRequest& request)
-{
-    pn::HTTPRequestHandler *handler = NULL;
-    std::vector< std::string > pathStrs;
-
-    //if (request.getURI() == "/")
-    //    return new HNodeRestHandler();
-    //else
-
-    for( std::vector< HNRestPath >::iterator it = pathList.begin(); it != pathList.end(); it++ )
-    {
-        handler = it->checkForHandler( request, pathStrs );
-        if( handler != NULL )
-            return handler;
-    }
-
-    return handler;
-}
-#endif
 

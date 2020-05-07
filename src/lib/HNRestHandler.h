@@ -5,8 +5,8 @@
 #include <map>
 
 
-#define HNR_HTTP_INTERNAL_SERVER_ERROR   501
-
+#define HNR_HTTP_INTERNAL_SERVER_ERROR   500
+#define HNR_HTTP_NOT_IMPLEMENTED         501
 
 class HNOperationData;
 

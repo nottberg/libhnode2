@@ -102,6 +102,18 @@ HNDEndpoint::~HNDEndpoint()
 }
 
 void 
+HNDEndpoint::setTypeName( std::string value )
+{
+    typeName = value;
+}
+
+void 
+HNDEndpoint::setVersion( std::string value )
+{
+    version = value;
+}
+
+void 
 HNDEndpoint::setDispatch( std::string dispatchID, HNDEPDispatchInf *dispatchInf )
 {
     m_dispatchID  = dispatchID;
@@ -112,6 +124,18 @@ void
 HNDEndpoint::setOpenAPIJson( std::string OPAJson )
 {
     m_OpenAPI = OPAJson;
+}
+
+std::string 
+HNDEndpoint::getTypeName()
+{
+    return typeName;
+}
+
+std::string 
+HNDEndpoint::getVersion()
+{
+    return version;
 }
 
 std::string 
@@ -427,7 +451,7 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
     else
     {
         // Send back not implemented
-
+        opData->responseSetStatusAndReason( HNR_HTTP_NOT_IMPLEMENTED );
     }
 }
 

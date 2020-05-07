@@ -30,6 +30,9 @@ class HNDEPDispatchInf
 class HNDEndpoint
 {
     private:
+        std::string typeName;
+        std::string version;
+
         std::string m_dispatchID;
         HNDEPDispatchInf *m_dispatchInf;
         
@@ -39,9 +42,15 @@ class HNDEndpoint
         HNDEndpoint();
        ~HNDEndpoint();
 
+        void setTypeName( std::string value );
+        void setVersion( std::string value );
+
         void setDispatch( std::string dispatchID, HNDEPDispatchInf *dispatchInf );
 
         void setOpenAPIJson( std::string OPAJson );
+
+        std::string getTypeName();
+        std::string getVersion();
 
         std::string getDispatchID();
 
