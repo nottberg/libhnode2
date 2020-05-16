@@ -4,7 +4,7 @@
 #include <string>
 #include <map>
 
-
+#define HNR_HTTP_NOT_FOUND               404
 #define HNR_HTTP_INTERNAL_SERVER_ERROR   500
 #define HNR_HTTP_NOT_IMPLEMENTED         501
 
@@ -45,6 +45,7 @@ class HNOperationData
 
         void setParam( std::string key, std::string value );
 
+        bool getParam( std::string key, std::string &value );
 
         void responseSetChunkedTransferEncoding( bool enabled );
         void responseSetContentType( std::string contentType );

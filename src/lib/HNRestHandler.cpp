@@ -54,6 +54,23 @@ HNOperationData::setParam( std::string key, std::string value )
     m_params.insert( std::pair< std::string, std::string >( key, value ) );
 }
 
+bool 
+HNOperationData::getParam( std::string key, std::string &value )
+{
+    value.clear();
+
+    // Lookup
+    std::map< std::string, std::string >::iterator it = m_params.find( key );
+
+    // Not found
+    if( it == m_params.end() )
+        return true;
+
+    // Found
+    value = it->second;
+    return false;
+}
+
 void 
 HNOperationData::responseSetChunkedTransferEncoding( bool enabled )
 {
