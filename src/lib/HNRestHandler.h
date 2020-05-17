@@ -4,6 +4,9 @@
 #include <string>
 #include <map>
 
+#define HNR_HTTP_OK                      200
+#define HNR_HTTP_BAD_REQUEST             400
+#define HNR_HTTP_CONFLICT                409
 #define HNR_HTTP_NOT_FOUND               404
 #define HNR_HTTP_INTERNAL_SERVER_ERROR   500
 #define HNR_HTTP_NOT_IMPLEMENTED         501
@@ -46,6 +49,8 @@ class HNOperationData
         void setParam( std::string key, std::string value );
 
         bool getParam( std::string key, std::string &value );
+
+        std::istream& requestBody();
 
         void responseSetChunkedTransferEncoding( bool enabled );
         void responseSetContentType( std::string contentType );

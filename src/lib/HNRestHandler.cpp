@@ -71,6 +71,12 @@ HNOperationData::getParam( std::string key, std::string &value )
     return false;
 }
 
+std::istream& 
+HNOperationData::requestBody()
+{
+    return ((pn::HTTPServerRequest*) m_reqObj)->stream();
+}
+
 void 
 HNOperationData::responseSetChunkedTransferEncoding( bool enabled )
 {
