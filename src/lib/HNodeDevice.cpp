@@ -156,15 +156,40 @@ HNDEndpoint::getOpenAPIJson()
     return m_OpenAPI;
 }
 
+HNodeDevice::HNodeDevice()
+{
+    m_devType     = "hnode2-default-device";
+    m_devInstance = "default";
+    m_version     = "2.0.0";
+
+    m_port        = 8080;
+
+    m_ownerState  = "available";
+
+    HNDEndpoint hndEP;
+
+    hndEP.setDispatch( "hnode2Dev", this );
+    hndEP.setOpenAPIJson( g_HNode2DeviceRest ); 
+
+    addEndpoint( hndEP );
+}
+
 HNodeDevice::HNodeDevice( std::string deviceType, std::string instance )
 {
-    devType     = deviceType;
-    devInstance = instance;
-    version     = "2.0.0";
+    m_devType     = deviceType;
+    m_devInstance = instance;
+    m_version     = "2.0.0";
 
-    port        = 8080;
+    m_port        = 8080;
 
-    ownerState  = "available";
+    m_ownerState  = "available";
+
+    HNDEndpoint hndEP;
+
+    hndEP.setDispatch( "hnode2Dev", this );
+    hndEP.setOpenAPIJson( g_HNode2DeviceRest ); 
+
+    addEndpoint( hndEP );
 }
 
 HNodeDevice::~HNodeDevice()
@@ -172,61 +197,73 @@ HNodeDevice::~HNodeDevice()
 
 }
 
-std::string 
-HNodeDevice::getInstance()
+void
+HNodeDevice::setDeviceType( std::string value )
 {
-    return devInstance;
+    m_devType = value;
+}
+
+void 
+HNodeDevice::setInstance( std::string value )
+{
+    m_devInstance = value;
 }
 
 std::string 
 HNodeDevice::getDeviceType()
 {
-    return devType;
+    return m_devType;
+}
+
+std::string 
+HNodeDevice::getInstance()
+{
+    return m_devInstance;
 }
 
 std::string 
 HNodeDevice::getVersionStr()
 {
-    return version;
+    return m_version;
 }
 
 std::string 
 HNodeDevice::getHNodeIDStr()
 {
     std::string rstStr;
-    hnodeID.getStr( rstStr );
+    m_hnodeID.getStr( rstStr );
     return rstStr;
 }
 
 std::string 
 HNodeDevice::getHNodeIDCRC32Str()
 {
-    return hnodeID.getCRC32AsHexStr();
+    return m_hnodeID.getCRC32AsHexStr();
 }
 
 void 
 HNodeDevice::setName( std::string value )
 {
-    name = value;
+    m_name = value;
 }
 
 std::string
 HNodeDevice::getName()
 {
-    return name;
+    return m_name;
 }
 
 std::string 
 HNodeDevice::getOwnerState()
 {
-    return ownerState;
+    return m_ownerState;
 }
 
 std::string 
 HNodeDevice::getOwnerHNodeIDStr()
 {
     std::string rstStr;
-    ownerHNodeID.getStr( rstStr );
+    m_ownerHNodeID.getStr( rstStr );
     return rstStr;
 }
 
@@ -235,13 +272,76 @@ HNodeDevice::createAvahiName()
 {
     char tmpBuf[256];
 
-    sprintf( tmpBuf, "%s-%s-%s", devType.c_str(), devInstance.c_str(), hnodeID.getCRC32AsHexStr().c_str() );
+    sprintf( tmpBuf, "%s-%s-%s", m_devType.c_str(), m_devInstance.c_str(), m_hnodeID.getCRC32AsHexStr().c_str() );
 
     return tmpBuf;
 }
 
-#define HND_CFGFILE_ROOT_DEFAULT  "/etc/hnode2/"
+HND_RESULT_T 
+HNodeDevice::initConfigSections( HNodeConfig &cfg )
+{
+    std::string rstStr;
+    HNCSection *secPtr;
 
+    // Get a pointer to the device section
+    cfg.updateSection( "device", &secPtr );
+
+    // Create a new unique hnodeID
+    HNodeID hnodeID;
+    hnodeID.create();
+    hnodeID.getStr( rstStr );
+    secPtr->updateValue( "hnodeID", rstStr );
+
+    // Create default name
+    secPtr->updateValue( "name", "InitialName" );
+}
+
+HND_RESULT_T 
+HNodeDevice::updateConfigSections( HNodeConfig &cfg )
+{
+    std::string rstStr;
+    HNCSection *secPtr;
+
+    // Get a pointer to the device section
+    cfg.updateSection( "device", &secPtr );
+
+    // Update the hnodeID
+    m_hnodeID.getStr( rstStr );
+    secPtr->updateValue( "hnodeID", rstStr );
+
+    // Update the name
+    secPtr->updateValue( "name", getName() );
+}
+
+HND_RESULT_T 
+HNodeDevice::readConfigSections( HNodeConfig &cfg )
+{
+    HNCSection  *secPtr;
+    std::string rstStr;
+
+    // Aquire a pointer to the "device" section
+    cfg.updateSection( "device", &secPtr );
+
+    // Read out the HNodeID
+    if( secPtr->getValueByName( "hnodeID", rstStr ) != HNC_RESULT_SUCCESS )
+    {
+        return HND_RESULT_FAILURE;
+    }
+
+    m_hnodeID.setFromStr( rstStr );
+
+    // Read the name field
+    if( secPtr->getValueByName( "name", rstStr ) != HNC_RESULT_SUCCESS )
+    {
+        return HND_RESULT_FAILURE;
+    }
+
+    setName( rstStr );
+  
+    return HND_RESULT_SUCCESS;
+}
+
+#if 0
 bool 
 HNodeDevice::configExists()
 {
@@ -249,7 +349,7 @@ HNodeDevice::configExists()
 
     cfgFile.setRootPath( HND_CFGFILE_ROOT_DEFAULT );
 
-    return cfgFile.configExists( devType, devInstance );
+    return cfgFile.configExists( m_devType, m_devInstance );
 }
 
 HND_RESULT_T
@@ -263,7 +363,7 @@ HNodeDevice::loadConfig()
 
     cfgFile.setRootPath( HND_CFGFILE_ROOT_DEFAULT );
 
-    if( cfgFile.loadConfig( devType, devInstance, cfg ) != HNC_RESULT_SUCCESS )
+    if( cfgFile.loadConfig( m_devType, m_devInstance, cfg ) != HNC_RESULT_SUCCESS )
     {
         std::cout << "ERROR: Could not load saved configuration." << std::endl;
         return HND_RESULT_FAILURE;
@@ -278,7 +378,7 @@ HNodeDevice::loadConfig()
         return HND_RESULT_FAILURE;
     }
 
-    hnodeID.setFromStr( rstStr );
+    m_hnodeID.setFromStr( rstStr );
 
     // Read the name field
     if( secPtr->getValueByName( "name", rstStr ) != HNC_RESULT_SUCCESS )
@@ -301,7 +401,7 @@ HNodeDevice::saveConfig()
     HNCSection *secPtr;
     cfg.updateSection( "device", &secPtr );
  
-    hnodeID.getStr( rstStr );
+    m_hnodeID.getStr( rstStr );
     secPtr->updateValue( "hnodeID", rstStr );
 
     secPtr->updateValue( "name", getName() );
@@ -312,7 +412,7 @@ HNodeDevice::saveConfig()
     cfgFile.setRootPath( HND_CFGFILE_ROOT_DEFAULT );
 
     std::cout << "Saving config..." << std::endl;
-    if( cfgFile.saveConfig( devType, devInstance, cfg ) != HNC_RESULT_SUCCESS )
+    if( cfgFile.saveConfig( m_devType, m_devInstance, cfg ) != HNC_RESULT_SUCCESS )
     {
         std::cout << "ERROR: Could not save initial configuration." << std::endl;
         return HND_RESULT_FAILURE;
@@ -325,19 +425,19 @@ void
 HNodeDevice::initToDefaults()
 {
     // Create a new uuid
-    hnodeID.create();
+    m_hnodeID.create();
 
     // Set a default name
     setName( "Name" );
 }
-
+#endif
 
 HND_RESULT_T 
 HNodeDevice::addEndpoint( HNDEndpoint newEP )
 {
-    endpointMap.insert( std::pair< std::string, HNDEndpoint >( newEP.getDispatchID(), newEP ) );
+    m_endpointMap.insert( std::pair< std::string, HNDEndpoint >( newEP.getDispatchID(), newEP ) );
 
-    rest.registerEndpointsFromOpenAPI( newEP.getDispatchID(), this, newEP.getOpenAPIJson() );
+    m_rest.registerEndpointsFromOpenAPI( newEP.getDispatchID(), this, newEP.getOpenAPIJson() );
 
     return HND_RESULT_SUCCESS;
 }
@@ -347,6 +447,7 @@ HNodeDevice::start()
 {
     std::string rstStr;
 
+#if 0
     std::cout << "Looking for config file" << std::endl;
     
     if( configExists() == false )
@@ -358,30 +459,24 @@ HNodeDevice::start()
     loadConfig();
 
     std::cout << "Done loading configuration" << std::endl;
+#endif
 
     std::cout << "Starting HNAvahi..." << std::endl;
 
-    avObj.setID( HNODE_DEVICE_AVAHI_TYPE, createAvahiName() );
-    avObj.setPort( port );
+    m_avObj.setID( HNODE_DEVICE_AVAHI_TYPE, createAvahiName() );
+    m_avObj.setPort( m_port );
 
-    hnodeID.getStr( rstStr );    
-    avObj.setSrvPair( "hnodeID", rstStr );
-    avObj.setSrvPair( "crc32ID", hnodeID.getCRC32AsHexStr() );
-    avObj.setSrvPair( "name", getName() );
-    avObj.setSrvPair( "devType", devType );
+    m_hnodeID.getStr( rstStr );    
+    m_avObj.setSrvPair( "hnodeID", rstStr );
+    m_avObj.setSrvPair( "crc32ID", m_hnodeID.getCRC32AsHexStr() );
+    m_avObj.setSrvPair( "name", getName() );
+    m_avObj.setSrvPair( "devType", getDeviceType() );
 
-    avObj.start();
+    m_avObj.start();
 
     std::cout << "Started HNAvahi..." << std::endl;
 
-    HNDEndpoint hndEP;
-
-    hndEP.setDispatch( "hnode2Dev", this );
-    hndEP.setOpenAPIJson( g_HNode2DeviceRest ); 
-
-    addEndpoint( hndEP );
-
-    rest.start();
+    m_rest.start();
 }
 
 void 
@@ -462,10 +557,10 @@ HNodeDevice::restDispatch( HNOperationData *opData )
     std::cout << "  dispatchID: " << opData->getDispatchID() << std::endl;
 
     // Find the dispatch destination
-    std::map< std::string, HNDEndpoint >::iterator it = endpointMap.find( opData->getDispatchID() );
+    std::map< std::string, HNDEndpoint >::iterator it = m_endpointMap.find( opData->getDispatchID() );
 
     // No endpoint found?
-    if( it == endpointMap.end() )
+    if( it == m_endpointMap.end() )
     {
         // Respond not implemented
         return;

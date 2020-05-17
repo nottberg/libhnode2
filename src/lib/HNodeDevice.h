@@ -8,6 +8,7 @@
 #include "HNHttpServer.h"
 
 #define HNODE_DEVICE_AVAHI_TYPE  "_hnode2-rest-http._tcp"
+#define HND_CFGFILE_ROOT_DEFAULT  "/var/cache/hnode2/"
 
 // Forward declaration
 class HNodeDevice;
@@ -62,35 +63,38 @@ class HNDEndpoint
 class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
 {
     private:
-        std::string  devType;
-        std::string  devInstance;
-        std::string  version;
+        std::string  m_devType;
+        std::string  m_devInstance;
+        std::string  m_version;
 
-        uint16_t     port;
+        uint16_t     m_port;
 
-        HNodeID      hnodeID;
+        HNodeID      m_hnodeID;
 
-        std::string  name;
+        std::string  m_name;
 
-        std::string  ownerState;
-        HNodeID      ownerHNodeID;
+        std::string  m_ownerState;
+        HNodeID      m_ownerHNodeID;
 
-        std::map< std::string, HNDEndpoint > endpointMap;
+        std::map< std::string, HNDEndpoint > m_endpointMap;
 
-        HNAvahi      avObj;
+        HNAvahi      m_avObj;
 
-        HNHttpServer rest;
+        HNHttpServer m_rest;
 
         std::string createAvahiName();
 
-        bool configExists();
-        HND_RESULT_T loadConfig();
-        HND_RESULT_T saveConfig();
+        //bool configExists();
+        //HND_RESULT_T loadConfig();
+        //HND_RESULT_T saveConfig();
 
     public:
+        HNodeDevice();
         HNodeDevice( std::string deviceType, std::string devInstance );
        ~HNodeDevice();
 
+        void setDeviceType( std::string type );
+        void setInstance( std::string instance );
         void setPort( uint16_t port );
         void setName( std::string value );
 
@@ -108,7 +112,11 @@ class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
         std::string getOwnerState();
         std::string getOwnerHNodeIDStr();
 
-        void initToDefaults();
+        HND_RESULT_T initConfigSections( HNodeConfig &cfg );
+        HND_RESULT_T updateConfigSections( HNodeConfig &cfg );
+        HND_RESULT_T readConfigSections( HNodeConfig &cfg );
+
+        //void initToDefaults();
 
         HND_RESULT_T addEndpoint( HNDEndpoint newEP );
 
