@@ -6,7 +6,6 @@
 #include "Poco/String.h"
 
 #include "HNAvahi.h"
-#include "HNodeConfig.h"
 #include "HNodeDevice.h"
 
 namespace pjs = Poco::JSON;

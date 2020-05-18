@@ -6,6 +6,7 @@
 #include "HNodeID.h"
 #include "HNAvahi.h"
 #include "HNHttpServer.h"
+#include "HNodeConfig.h"
 
 #define HNODE_DEVICE_AVAHI_TYPE  "_hnode2-rest-http._tcp"
 #define HND_CFGFILE_ROOT_DEFAULT  "/var/cache/hnode2/"
