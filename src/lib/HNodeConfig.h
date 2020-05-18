@@ -5,6 +5,8 @@
 #include <vector>
 #include <map>
 
+#define HNCFG_DEFAULT_CFG_PATH  "/var/cache/hnode2/"
+
 typedef enum HNCResultEnumeration
 {
     HNC_RESULT_SUCCESS,

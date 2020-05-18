@@ -340,7 +340,7 @@ HNodeConfig::debugPrint( uint offset )
 // std::string rootPath;
 HNodeConfigFile::HNodeConfigFile()
 {
-    rootPath = "/etc/hnode2";
+    rootPath = HNCFG_DEFAULT_CFG_PATH;
 }
 
 HNodeConfigFile::~HNodeConfigFile()
