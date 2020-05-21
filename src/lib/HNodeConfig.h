@@ -27,6 +27,8 @@ class HNCObj
 
         HNC_RESULT_T updateValue( std::string key, std::string value );
 
+        HNC_RESULT_T getValueByName( std::string key, std::string &value );
+
         void getValuePairs( std::map< std::string, std::string > &pairs );
 
         void debugPrint( uint offset );

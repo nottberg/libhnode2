@@ -35,6 +35,21 @@ HNCObj::updateValue( std::string key, std::string value )
     pairMap[ key ] = value;
 }
 
+HNC_RESULT_T 
+HNCObj::getValueByName( std::string key, std::string &value )
+{
+    value.clear();
+
+    std::map< std::string, std::string >::iterator it = pairMap.find( key );
+
+    if( it == pairMap.end() )
+        return HNC_RESULT_FAILURE;
+
+    value = it->second;
+
+    return HNC_RESULT_SUCCESS;
+}
+
 void 
 HNCObj::getValuePairs( std::map< std::string, std::string > &pairs )
 {
