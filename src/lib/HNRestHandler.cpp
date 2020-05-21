@@ -2,6 +2,7 @@
 
 #include "Poco/Net/HTTPServerRequest.h"
 #include "Poco/Net/HTTPServerResponse.h"
+#include "Poco/URI.h"
 
 #include "HNRestHandler.h"
 
@@ -99,6 +100,20 @@ void
 HNOperationData::responseSetStatusAndReason( uint resultCode )
 {
     ((pn::HTTPServerResponse*) m_rspObj)->setStatusAndReason( (pn::HTTPResponse::HTTPStatus) resultCode );
+}
+
+void 
+HNOperationData::responseSetCreated( std::string objID )
+{
+   Poco::URI uri;
+ 
+   uri = ((pn::HTTPServerRequest*) m_reqObj)->getURI();
+
+   std::string rdURI = uri.getScheme() + "://" + uri.getHost() + uri.getPath() + "/" + objID;
+
+   std::cout << "Location URL: " << rdURI << std::endl;
+
+   ((pn::HTTPServerResponse*) m_rspObj)->redirect( rdURI, pn::HTTPResponse::HTTPStatus::HTTP_CREATED );
 }
 
 void

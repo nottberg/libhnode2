@@ -5,6 +5,7 @@
 #include <map>
 
 #define HNR_HTTP_OK                      200
+#define HNR_HTTP_CREATED                 201
 #define HNR_HTTP_BAD_REQUEST             400
 #define HNR_HTTP_CONFLICT                409
 #define HNR_HTTP_NOT_FOUND               404
@@ -56,6 +57,7 @@ class HNOperationData
         void responseSetContentType( std::string contentType );
         std::ostream& responseSend();
         void responseSetStatusAndReason( uint resultCode );
+        void responseSetCreated( std::string objID );
 
         void restDispatch();
 };
