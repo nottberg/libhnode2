@@ -109,7 +109,7 @@ HNOperationData::responseSetCreated( std::string objID )
  
    uri = ((pn::HTTPServerRequest*) m_reqObj)->getURI();
 
-   std::string rdURI = uri.getScheme() + "://" + uri.getHost() + uri.getPath() + "/" + objID;
+   std::string rdURI = uri.getPath() + "/" + objID;
 
    std::cout << "Location URL: " << rdURI << std::endl;
 
