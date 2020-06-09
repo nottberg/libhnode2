@@ -44,6 +44,9 @@ class HNOperationData
 
         void setReqRsp( void *request, void *response );
 
+        void *getRequest();
+        void *getResponse();
+
         std::string getDispatchID();
         std::string getOpID();
 

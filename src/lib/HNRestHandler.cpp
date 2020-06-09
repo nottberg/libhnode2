@@ -49,6 +49,18 @@ HNOperationData::setReqRsp( void *reqObj, void *rspObj )
     m_rspObj = rspObj;
 }
 
+void *
+HNOperationData::getRequest()
+{
+    return m_reqObj;
+}
+
+void *
+HNOperationData::getResponse()
+{
+    return m_rspObj;
+}
+
 void 
 HNOperationData::setParam( std::string key, std::string value )
 {

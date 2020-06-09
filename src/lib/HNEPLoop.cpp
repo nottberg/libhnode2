@@ -2,8 +2,7 @@
 
 #define MAXEVENTS 8
 
-HNEPLoop::HNEPLoop( HNEPLoopCallbacks *parent )
-: m_parent( parent )
+HNEPLoop::HNEPLoop()
 {
     m_quit = true;
     m_epollFD   = (-1);
@@ -27,8 +26,11 @@ HNEPLoop::~HNEPLoop()
 }
 
 HNEP_RESULT_T 
-HNEPLoop::setup()
+HNEPLoop::setup( HNEPLoopCallbacks *parent )
 {
+    // Set callbacks
+    m_parent = parent;
+
     // Initialize for event loop
     m_epollFD = epoll_create1( 0 );
     if( m_epollFD == -1 )

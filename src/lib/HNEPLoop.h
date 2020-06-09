@@ -30,13 +30,16 @@ class HNEPLoopCallbacks
 class HNEPLoop
 {
     public:
-        HNEPLoop( HNEPLoopCallbacks *parent );
+        HNEPLoop();
        ~HNEPLoop();
 
-        HNEP_RESULT_T setup();
+        HNEP_RESULT_T setup( HNEPLoopCallbacks *parent );
         void stop();
 
         HNEP_RESULT_T run();
+
+        HNEP_RESULT_T addFDToEPoll( int sfd );
+        HNEP_RESULT_T removeFDFromEPoll( int sfd );
 
     private:
         bool m_quit;
@@ -49,8 +52,6 @@ class HNEPLoop
         int m_epollFD;
         struct epoll_event *m_events;
 
-        HNEP_RESULT_T addFDToEPoll( int sfd );
-        HNEP_RESULT_T removeFDFromEPoll( int sfd );
 };
 
 #endif // _HN_EP_LOOP_H_
