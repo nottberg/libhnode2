@@ -49,6 +49,9 @@ HNEPLoop::setup( HNEPLoopCallbacks *parent )
 
     // Ready to run again.
     m_quit = false;
+
+    // Setup complete
+    return HNEP_RESULT_SUCCESS;
 }
 
 void 
@@ -111,6 +114,9 @@ HNEPLoop::run()
                 m_parent->fdEvent( m_events[i].data.fd );
         }
     }
+
+    // Successful exit
+    return HNEP_RESULT_SUCCESS;
 }
 
 HNEP_RESULT_T
