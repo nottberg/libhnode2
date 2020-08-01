@@ -19,7 +19,7 @@ HNReqWaitAction::~HNReqWaitAction()
 
 }
 
-HNRW_RESULT_T
+void
 HNReqWaitAction::wait()
 {
     int idx = 35;
@@ -29,7 +29,7 @@ HNReqWaitAction::wait()
 
     resCode = HNRW_RESULT_WAITING;
 
-    std::cerr << "Thread " << std::this_thread::get_id() << " waiting...." << '\n';
+    std::cerr << "Waiting...thread: " << std::this_thread::get_id() << '\n';
 
     if( cv.wait_for( lk, idx*1000ms, [this]{return resCode != HNRW_RESULT_WAITING;} ) ) 
     {
@@ -40,18 +40,23 @@ HNReqWaitAction::wait()
         std::cerr << "Thread " << std::this_thread::get_id() << " timed out. resCode == " << resCode << '\n';
         resCode = HNRW_RESULT_TIMEOUT;
     }
-
-    return resCode;
 }
 
 void
-HNReqWaitAction::complete()
+HNReqWaitAction::complete( bool success )
 {
-    std::cerr << "Notifying...thread: \n" << std::this_thread::get_id() << std::endl;
+    std::cerr << "Completing...thread: " << std::this_thread::get_id() << std::endl;
     std::lock_guard<std::mutex> lk(m);
-    resCode = HNRW_RESULT_SUCCESS;
+    resCode = success ? HNRW_RESULT_SUCCESS : HNRW_RESULT_FAILURE;
     cv.notify_all();
 }
+
+HNRW_RESULT_T 
+HNReqWaitAction::getStatus()
+{
+    return resCode;
+}
+
 
 HNReqWaitQueue::HNReqWaitQueue()
 {
@@ -109,39 +114,28 @@ HNReqWaitQueue::postAndWait( HNReqWaitAction *record )
 {
     uint64_t inc = 1;
 
-    std::cout << "postAndWait...start" << std::endl;
-
     // Grab queue lock
     std::unique_lock< std::mutex > qlock( queueMutex );
-
-    //std::cout << "postAndWait...locking queue" << std::endl;
-
-    //qlock.lock();
-
-    std::cout << "postAndWait...queue" << std::endl;
 
     // Add new record
     postQueue.push_back( record );
 
-    std::cout << "postAndWait...cnt" << std::endl;
-
     // Account for new entry
     postCnt += 1;
-
-    std::cout << "postAndWait...eventFD" << std::endl;
 
     // Update wakeup event
     ssize_t result = write( eventFD, &inc, sizeof( inc ) );
 
     if( result != sizeof( inc ) )
     {
+        std::cerr << "ERROR: Failed to update eventFD" << std::endl;
         // Error
     }
 
+    // Drop the queue lock
     qlock.unlock();
 
-    std::cout << "Waiting..." << std::endl;
-
+    // Block to wait for processing
     record->wait();
 }
 

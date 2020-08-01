@@ -26,9 +26,19 @@ class HNReqWaitAction
         HNReqWaitAction();
        ~HNReqWaitAction();
 
-        HNRW_RESULT_T wait();
+        // Called by requesting thread
+        // to block until response is ready
+        void wait();
 
-        void complete();
+        // Call by processing thread
+        // when request has been completed.
+        void complete( bool success );
+
+        // Get the overall status of request
+        // after completion, derived classes 
+        // will provide thier own app specific
+        // status
+        HNRW_RESULT_T getStatus();
 };
 
 class HNReqWaitQueue
