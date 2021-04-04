@@ -20,14 +20,23 @@ HNReqWaitAction::~HNReqWaitAction()
 }
 
 void
+HNReqWaitAction::prepare()
+{
+    // Setup to begin waiting
+    std::unique_lock<std::mutex> lk(m);
+
+    std::cerr << "Preparing...thread: " << std::this_thread::get_id() << '\n';
+
+    resCode = HNRW_RESULT_WAITING;
+}
+
+void
 HNReqWaitAction::wait()
 {
     int idx = 35;
 
     // Wait until we are woken up or timeout
     std::unique_lock<std::mutex> lk(m);
-
-    resCode = HNRW_RESULT_WAITING;
 
     std::cerr << "Waiting...thread: " << std::this_thread::get_id() << '\n';
 
@@ -81,7 +90,7 @@ HNReqWaitQueue::init()
     postCnt = 0;
     postQueue.clear();
 
-    eventFD = eventfd( 0, EFD_NONBLOCK );
+    eventFD = eventfd( 0, (EFD_NONBLOCK | EFD_SEMAPHORE) );
 
     if( eventFD < 0 )
     {
@@ -116,6 +125,9 @@ HNReqWaitQueue::postAndWait( HNReqWaitAction *record )
 
     // Grab queue lock
     std::unique_lock< std::mutex > qlock( queueMutex );
+
+    // Prepare to wait
+    record->prepare();
 
     // Add new record
     postQueue.push_back( record );
@@ -152,7 +164,7 @@ HNReqWaitQueue::aquireRecord()
     if( postCnt == 0 )
         return NULL;
 
-    // Read the eventFD, which will clear it to zero
+    // Read the eventFD, which will decrement the count by 1.
     read( eventFD, &buf, sizeof(buf) ); 
     
     // Grab the front element from the queue

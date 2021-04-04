@@ -207,17 +207,17 @@ HNRestPath::checkForHandler( std::string httpMethod, std::vector< std::string > 
     // then path won't match
     if( m_elements.size() != urlStrs.size() )
     {
-        printf( "Path different sizes: %ld %ld\n", m_elements.size(), urlStrs.size() );
+        //printf( "Path different sizes: %ld %ld\n", m_elements.size(), urlStrs.size() );
         return NULL;
     }
 
     // If the request type is wrong then move on
     // Always use upper case for method names
     std::transform( httpMethod.begin(), httpMethod.end(), httpMethod.begin(), ::toupper);
-    std::cout << "Method compare: " << m_method << " " << httpMethod << std::endl;
+    //std::cout << "Method compare: " << m_method << " " << httpMethod << std::endl;
     if( m_method != httpMethod )
     {
-        printf( "Methods don't match\n" );
+        //printf( "Methods don't match\n" );
         return NULL;
     }
 
@@ -230,7 +230,7 @@ HNRestPath::checkForHandler( std::string httpMethod, std::vector< std::string > 
         switch( it->getType() )
         {
             case HNRPE_TYPE_PATH:
-                printf( "Path Check (%d): %s %s\n", indx, it->getName().c_str(), urlStrs[ indx ].c_str() );
+                //printf( "Path Check (%d): %s %s\n", indx, it->getName().c_str(), urlStrs[ indx ].c_str() );
                 if( it->getName() != urlStrs[ indx ] )
                 {
                     delete opData;

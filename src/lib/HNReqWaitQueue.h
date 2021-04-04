@@ -26,6 +26,9 @@ class HNReqWaitAction
         HNReqWaitAction();
        ~HNReqWaitAction();
 
+        // Get ready to block until response is ready
+        void prepare();
+
         // Called by requesting thread
         // to block until response is ready
         void wait();

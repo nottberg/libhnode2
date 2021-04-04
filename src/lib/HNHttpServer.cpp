@@ -97,14 +97,14 @@ HNRestHandlerFactory::createRequestHandler( const pn::HTTPServerRequest& request
     //    return new HNodeRestHandler();
     //else
 
-    std::cout << "Server Request method: " << request.getMethod() << std::endl;
-    std::cout << "Server Request URI: " << uri.toString() << std::endl;
+    //std::cout << "Server Request method: " << request.getMethod() << std::endl;
+    //std::cout << "Server Request URI: " << uri.toString() << std::endl;
 
     uri.getPathSegments( pathStrs );
 
     for( std::vector< HNRestPath >::iterator it = pathList.begin(); it != pathList.end(); it++ )
     {
-        std::cout << "Check handler: " << it->getOpID() << std::endl;
+        //std::cout << "Check handler: " << it->getOpID() << std::endl;
         opData = it->checkForHandler( request.getMethod(), pathStrs );
         if( opData != NULL )
             return new HNRestHandler( opData );
