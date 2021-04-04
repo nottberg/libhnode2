@@ -13,7 +13,7 @@ class HNodeID
 
     public:
         HNodeID();
-        HNodeID( HNodeID &src );
+        HNodeID( const HNodeID &src );
        ~HNodeID();
 
         void create();

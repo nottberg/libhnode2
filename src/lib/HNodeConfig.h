@@ -5,6 +5,9 @@
 #include <vector>
 #include <map>
 
+#define HNCFG_DEFAULT_CFG_PATH  "/var/cache/hnode2/"
+#define HNCFG_DEFAULT_CFG_FNAME "hnode2_config.json"
+
 typedef enum HNCResultEnumeration
 {
     HNC_RESULT_SUCCESS,
@@ -23,6 +26,8 @@ class HNCObj
         void clear();
 
         HNC_RESULT_T updateValue( std::string key, std::string value );
+
+        HNC_RESULT_T getValueByName( std::string key, std::string &value );
 
         void getValuePairs( std::map< std::string, std::string > &pairs );
 
@@ -74,6 +79,8 @@ class HNCSection
 
         std::string getName();
 
+        HNC_RESULT_T getValueByName( std::string key, std::string &value );
+
         void getValuePairs( std::map< std::string, std::string > &pairs );
         void getListPairs( std::map< std::string, HNCObjList* > &pairs );
 
@@ -105,11 +112,12 @@ class HNodeConfig
 class HNodeConfigFile
 {
     private:
-        std::string rootPath;
+        std::string m_cfgFName;
+        std::string m_rootPath;
 
-        HNC_RESULT_T verifyFilename( std::string baseName, std::string instanceName, std::string &fbase );
+        HNC_RESULT_T generatePathExtension( std::string baseName, std::string instanceName, std::string &pathExt );
         bool fileExists( std::string fPath );
-        HNC_RESULT_T createDirectories();
+        HNC_RESULT_T createDirectories( std::string dPath );
         HNC_RESULT_T createFile( std::string fPath );
         HNC_RESULT_T moveFile( std::string srcPath, std::string dstPath );
 

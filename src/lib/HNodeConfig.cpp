@@ -35,6 +35,21 @@ HNCObj::updateValue( std::string key, std::string value )
     pairMap[ key ] = value;
 }
 
+HNC_RESULT_T 
+HNCObj::getValueByName( std::string key, std::string &value )
+{
+    value.clear();
+
+    std::map< std::string, std::string >::iterator it = pairMap.find( key );
+
+    if( it == pairMap.end() )
+        return HNC_RESULT_FAILURE;
+
+    value = it->second;
+
+    return HNC_RESULT_SUCCESS;
+}
+
 void 
 HNCObj::getValuePairs( std::map< std::string, std::string > &pairs )
 {
@@ -165,6 +180,21 @@ HNC_RESULT_T
 HNCSection::clearValue( std::string key )
 {
     pairMap.erase( key );
+}
+
+HNC_RESULT_T 
+HNCSection::getValueByName( std::string key, std::string &value )
+{
+    value.clear();
+
+    std::map< std::string, std::string >::iterator it = pairMap.find( key );
+
+    if( it == pairMap.end() )
+        return HNC_RESULT_FAILURE;
+
+    value = it->second;
+
+    return HNC_RESULT_SUCCESS;
 }
 
 void 
@@ -325,7 +355,8 @@ HNodeConfig::debugPrint( uint offset )
 // std::string rootPath;
 HNodeConfigFile::HNodeConfigFile()
 {
-    rootPath = "/etc/hnode2";
+    m_rootPath = HNCFG_DEFAULT_CFG_PATH;
+    m_cfgFName = HNCFG_DEFAULT_CFG_FNAME;
 }
 
 HNodeConfigFile::~HNodeConfigFile()
@@ -335,21 +366,21 @@ HNodeConfigFile::~HNodeConfigFile()
 void 
 HNodeConfigFile::setRootPath( std::string value )
 {
-    rootPath = value;
+    m_rootPath = value;
 }
 
 std::string 
 HNodeConfigFile::getRootPath()
 {
-    return rootPath;
+    return m_rootPath;
 }
 
 HNC_RESULT_T 
-HNodeConfigFile::verifyFilename( std::string baseName, std::string instanceName, std::string &fbase )
+HNodeConfigFile::generatePathExtension( std::string baseName, std::string instanceName, std::string &pathExt )
 {
-    char fname[ 256 ];
+    char path[ 256 ];
  
-    fbase.clear();
+    pathExt.clear();
 
     if( baseName.empty() == true )
         return HNC_RESULT_FAILURE;
@@ -357,9 +388,9 @@ HNodeConfigFile::verifyFilename( std::string baseName, std::string instanceName,
     if( instanceName.empty() == true )
         return HNC_RESULT_FAILURE;
   
-    sprintf( fname, "hncfg_%s_%s", baseName.c_str(), instanceName.c_str() );
+    sprintf( path, "%s-%s", baseName.c_str(), instanceName.c_str() );
 
-    fbase = fname;
+    pathExt = path;
 
     return HNC_RESULT_SUCCESS;
 }
@@ -384,9 +415,9 @@ HNodeConfigFile::fileExists( std::string fPath )
 }
 
 HNC_RESULT_T
-HNodeConfigFile::createDirectories()
+HNodeConfigFile::createDirectories( std::string dPath )
 {
-    Poco::Path path( rootPath );
+    Poco::Path path( dPath );
     path.makeDirectory();
 
     Poco::File dir( path );
@@ -415,6 +446,8 @@ HNodeConfigFile::createDirectories()
 HNC_RESULT_T 
 HNodeConfigFile::createFile( std::string fPath )
 {
+    std::cout << "CreateFile: " << fPath << std::endl;
+
     if( fileExists( fPath ) == true )
     {
         return HNC_RESULT_SUCCESS;
@@ -431,6 +464,7 @@ HNodeConfigFile::createFile( std::string fPath )
     }
     catch( Poco::Exception ex )
     {
+        std::cout << "CreateFile Exception: " << ex.displayText() << std::endl;
         return HNC_RESULT_FAILURE;
     }
 
@@ -466,49 +500,50 @@ HNodeConfigFile::moveFile( std::string srcFN, std::string dstFN )
 bool 
 HNodeConfigFile::configExists( std::string baseName, std::string instanceName )
 {
-    std::string fname;
+    std::string pext;
 
-    // Generate and verify filename
-    if( verifyFilename( baseName, instanceName, fname ) != HNC_RESULT_SUCCESS )
+    // Generate the path extension
+    if( generatePathExtension( baseName, instanceName, pext ) != HNC_RESULT_SUCCESS )
     {
         return false;
     }
 
-    // Tack on the json extension
-    fname += ".json";    
+    // Build target file path
+    Poco::Path dpath( m_rootPath );
+    dpath.makeDirectory();
+    dpath.pushDirectory( pext );
 
-    Poco::Path path( rootPath );
-    path.makeDirectory();
-    path.setFileName( fname );
+    Poco::Path tpath( dpath );
+    tpath.setFileName( m_cfgFName );
 
     // Existence determined
-    return fileExists( path.toString() );
+    return fileExists( tpath.toString() );
 }
 
 HNC_RESULT_T 
 HNodeConfigFile::loadConfig( std::string baseName, std::string instanceName, HNodeConfig &config )
 {
-    std::string fname;
+    std::string pext;
 
     // Clear any existing config information
     config.clear();
 
-    // Generate and verify filename
-    if( verifyFilename( baseName, instanceName, fname ) != HNC_RESULT_SUCCESS )
+    // Generate the path extension
+    if( generatePathExtension( baseName, instanceName, pext ) != HNC_RESULT_SUCCESS )
     {
         return HNC_RESULT_FAILURE;
     }
 
-    // Tack on the json extension
-    fname += ".json";    
-
     // Build target file path
-    Poco::Path path( rootPath );
-    path.makeDirectory();
-    path.setFileName( fname );
+    Poco::Path dpath( m_rootPath );
+    dpath.makeDirectory();
+    dpath.pushDirectory( pext );
+
+    Poco::Path tpath( dpath );
+    tpath.setFileName( m_cfgFName );
     
     // Check on the file
-    Poco::File file( path );
+    Poco::File file( tpath );
 
     if( file.exists() == false || file.isFile() == false )
     {
@@ -517,7 +552,7 @@ HNodeConfigFile::loadConfig( std::string baseName, std::string instanceName, HNo
 
     // Open a stream for reading
     std::ifstream its;
-    its.open( path.toString() );
+    its.open( tpath.toString() );
 
     if( its.is_open() == false )
     {
@@ -625,43 +660,47 @@ HNodeConfigFile::loadConfig( std::string baseName, std::string instanceName, HNo
 HNC_RESULT_T 
 HNodeConfigFile::saveConfig( std::string baseName, std::string instanceName, HNodeConfig config )
 {
-    std::string fname;
+    std::string pext;
 
-    // Create directories if necessary
-    if( createDirectories() != HNC_RESULT_SUCCESS )
+    // Generate the path extension
+    if( generatePathExtension( baseName, instanceName, pext ) != HNC_RESULT_SUCCESS )
     {
+        std::cerr << "ERROR: GeneratePathExtension" << std::endl;
         return HNC_RESULT_FAILURE;
     }
-
-    // Generate and verify filename
-    if( verifyFilename( baseName, instanceName, fname ) != HNC_RESULT_SUCCESS )
-    {
-        return HNC_RESULT_FAILURE;
-    }
-
-    // Tack on the json extension
-    fname += ".json";    
 
     // Build target file path
-    Poco::Path tpath( rootPath );
-    tpath.makeDirectory();
-    tpath.setFileName( fname );
+    Poco::Path dpath( m_rootPath );
+    dpath.makeDirectory();
+    dpath.pushDirectory( pext );
+
+    Poco::Path tpath( dpath );
+    tpath.setFileName( m_cfgFName );
+
+    // Create directories if necessary
+    if( createDirectories( dpath.toString() ) != HNC_RESULT_SUCCESS )
+    {
+        std::cerr << "ERROR: CreateDirectories" << std::endl;
+        return HNC_RESULT_FAILURE;
+    }
+
 
     // Create the target file if it doesn't exist
     if( createFile( tpath.toString() ) != HNC_RESULT_SUCCESS )
     {
+        std::cerr << "ERROR: CreateFile" << std::endl;
         return HNC_RESULT_FAILURE;
     }
 
     // Build temporary file path
-    fname += "_new";
-    Poco::Path npath( rootPath );
-    npath.makeDirectory();
-    npath.setFileName( fname );
+    std::string tmpCfgFile = m_cfgFName + "_new";
+    Poco::Path npath( dpath );
+    npath.setFileName( tmpCfgFile );
 
     // Create the temporary file
     if( createFile( npath.toString() ) != HNC_RESULT_SUCCESS )
     {
+        std::cerr << "ERROR: CreateFile2" << std::endl;
         return HNC_RESULT_FAILURE;
     }
 
@@ -671,6 +710,7 @@ HNodeConfigFile::saveConfig( std::string baseName, std::string instanceName, HNo
 
     if( ots.is_open() == false )
     {
+        std::cerr << "ERROR: StreamOpen" << std::endl;
         return HNC_RESULT_FAILURE;
     }
 
@@ -744,6 +784,7 @@ HNodeConfigFile::saveConfig( std::string baseName, std::string instanceName, HNo
     }
     catch( ... )
     {
+        std::cerr << "ERROR: Stringify exception." << std::endl;
         return HNC_RESULT_FAILURE;
     }
 
@@ -754,6 +795,7 @@ HNodeConfigFile::saveConfig( std::string baseName, std::string instanceName, HNo
     // with the new one.
     if( moveFile( npath.toString(), tpath.toString() ) != HNC_RESULT_SUCCESS )
     {
+        std::cerr << "ERROR: MoveFile" << std::endl;
         return HNC_RESULT_FAILURE;
     }
 

@@ -2,31 +2,25 @@
 #define _HN_HTTP_SERVER_H_
 
 #include <string>
-#include "Poco/Util/ServerApplication.h"
-#include "Poco/Net/HTTPRequestHandlerFactory.h"
-#include "Poco/Util/OptionSet.h"
 
-using Poco::Util::OptionSet;
+#include "HNRestHandler.h"
 
-class HNHttpServer: public Poco::Util::ServerApplication
+class HNHttpServer
 {
     public:
         HNHttpServer();
-        ~HNHttpServer();
+       ~HNHttpServer();
 
-    protected:
-        void initialize(Application& self);
+        void registerEndpointsFromOpenAPI( std::string dispatchID, HNRestDispatchInterface *dispatchInf, std::string openAPIJson );
 
-        void uninitialize();
-
-        void defineOptions(OptionSet& options);
-
-        void handleHelp(const std::string& name, const std::string& value);
-
-        int main(const std::vector<std::string>& args);
+        void start();
 
     private:
-        bool _helpRequested;
+        uint16_t m_port;
+
+        void *m_facPtr;
+
+        void *m_srvPtr;
 };
 
 #endif

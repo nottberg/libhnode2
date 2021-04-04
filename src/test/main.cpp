@@ -1,15 +1,6 @@
-#if 0
-#include "HNHttpServer.h"
-
-int 
-main( int argc, char** argv )
-{
-    HNHttpServer app;
-    return app.run(argc, argv);
-}
-#endif
-
 #include <unistd.h>
+
+#include <sys/epoll.h>
 
 #include <Poco/Util/Application.h>
 
@@ -23,8 +14,11 @@ main( int argc, char** argv )
 
 #include "HNHttpServer.h"
 #include "HNAvahi.h"
+#include "HNAvahiBrowser.h"
 #include "HNodeID.h"
 #include "HNodeConfig.h"
+
+#define MAXEVENTS 8
 
 class HNode2TestApp : public Poco::Util::Application
 {
@@ -32,6 +26,7 @@ class HNode2TestApp : public Poco::Util::Application
         bool _helpRequested;
         bool _httpServerTest;
         bool _avahiTest;
+        bool _avahiBrowserTest;
         bool _hnodeIDTest;
         bool _hnodeConfigTest;
 
@@ -49,11 +44,12 @@ class HNode2TestApp : public Poco::Util::Application
 
         void defineOptions( Poco::Util::OptionSet& optionSet )
         {
-            _helpRequested   = false;
-            _httpServerTest  = false;
-            _avahiTest       = false;
-            _hnodeIDTest     = false;
-            _hnodeConfigTest = false;
+            _helpRequested    = false;
+            _httpServerTest   = false;
+            _avahiTest        = false;
+            _avahiBrowserTest = false;
+            _hnodeIDTest      = false;
+            _hnodeConfigTest  = false;
 
             Poco::Util::Application::defineOptions( optionSet );
 
@@ -67,6 +63,10 @@ class HNode2TestApp : public Poco::Util::Application
 
             optionSet.addOption(
                 Poco::Util::Option( "avahi", "a", "Run Avahi test." ).callback( Poco::Util::OptionCallback<HNode2TestApp>(this, &HNode2TestApp::handleTest ) )
+            );
+
+            optionSet.addOption(
+                Poco::Util::Option( "avahi-browser", "b", "Run Avahi Browser test." ).callback( Poco::Util::OptionCallback<HNode2TestApp>(this, &HNode2TestApp::handleTest ) )
             );
 
             optionSet.addOption(
@@ -104,6 +104,8 @@ class HNode2TestApp : public Poco::Util::Application
                 _httpServerTest = true;
             else if( name == "avahi" )
                 _avahiTest = true;
+            else if( name == "avahi-browser" )
+                _avahiBrowserTest = true;
             else if( name == "hnodeid" )
                 _hnodeIDTest = true;
             else if( name == "hnodecfg" )
@@ -122,14 +124,18 @@ class HNode2TestApp : public Poco::Util::Application
             if( _httpServerTest == true )
             {
                 std::cout << "Running HNHttpServer test..." << std::endl;
-                HNHttpServer app;
-                return app.run(0, NULL);
+                //HNHttpServer app;
+                //app.start();
+                //sleep(300);
             }
             else if( _avahiTest == true )
             {
                 std::cout << "Running HNAvahi test..." << std::endl;
-                HNAvahi avObj( "_hnode2-http._tcp", "hnode2TestApp", 651 );
+                HNAvahi avObj;
 
+                avObj.setID( "_hnode2-http._tcp", "hnode2TestApp" );
+                avObj.setPort( 651 );
+ 
                 avObj.setSrvPair( "hnodeid", "12:34:45:67:89:01:23:45:12:34:45:67:89:01:23:45" );
                 avObj.setSrvPair( "paired", "false" );
                 avObj.setSrvTag( "tst-tag" );
@@ -137,6 +143,81 @@ class HNode2TestApp : public Poco::Util::Application
                 avObj.start();
                 sleep(30);
                 avObj.shutdown();
+            }
+            else if( _avahiBrowserTest == true )
+            {
+                std::cout << "Running HNAvahiBrowser test..." << std::endl;
+                HNAvahiBrowser avObj("_http._tcp");
+
+                // Initialize for event loop
+                int epollFD = epoll_create1( 0 );
+                if( epollFD == -1 )
+                {
+                    return Application::EXIT_SOFTWARE;
+                }
+
+                // Buffer where events are returned 
+                struct epoll_event event;
+                struct epoll_event *events = (struct epoll_event *) calloc( MAXEVENTS, sizeof event );
+
+                // Start the Browser Device
+                avObj.start();
+
+                // Add the browser event queue to wake us up.
+                int eventFD = avObj.getEventQueue().getEventFD();
+
+                event.data.fd = eventFD;
+                event.events = EPOLLIN | EPOLLET;
+                int s = epoll_ctl( epollFD, EPOLL_CTL_ADD, eventFD, &event );
+                if( s == -1 )
+                {
+                    return Application::EXIT_SOFTWARE;
+                }
+
+                // The event loop 
+                bool quit = false;
+                while( quit == false )
+                {
+                    int n;
+                    int i;
+
+                    // Check for events
+                    n = epoll_wait( epollFD, events, MAXEVENTS, 30000 );
+
+                    // EPoll error
+                    if( n < 0 )
+                    {
+                        return Application::EXIT_SOFTWARE;
+                    }
+
+                    // Check these critical tasks everytime
+                    // the event loop wakes up.
+ 
+                    // If it was a timeout then continue to next loop
+                    // skip socket related checks.
+                    if( n == 0 )
+                    {
+                        avObj.shutdown();
+                        return Application::EXIT_OK;
+                    }
+            
+                    // Socket event
+                    for( i = 0; i < n; i++ )
+	                {
+                        if( eventFD == events[i].data.fd )
+	                    {
+                            while( avObj.getEventQueue().getPostedCnt() )
+                            {
+                                HNAvahiBrowserEvent *event = (HNAvahiBrowserEvent*) avObj.getEventQueue().aquireRecord();
+
+                                std::cout << "Browser Event - name: " << event->getName() << std::endl;
+
+                                avObj.getEventQueue().releaseRecord( event );
+                            }
+                        }
+                    }
+                }
+
             }
             else if( _hnodeIDTest == true )
             {
