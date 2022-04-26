@@ -38,6 +38,13 @@ HNReqWaitAction::wait()
     // Wait until we are woken up or timeout
     std::unique_lock<std::mutex> lk(m);
 
+    // Check that the state is waiting, if not then already complete.
+    if( resCode != HNRW_RESULT_WAITING )
+    {
+        std::cerr << "Thread " << std::this_thread::get_id() << " no wait needed. resCode == " << resCode << '\n';
+        return;    
+    }
+    
     std::cerr << "Waiting...thread: " << std::this_thread::get_id() << '\n';
 
     if( cv.wait_for( lk, idx*1000ms, [this]{return resCode != HNRW_RESULT_WAITING;} ) ) 
