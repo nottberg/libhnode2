@@ -33,6 +33,8 @@ HNC_RESULT_T
 HNCObj::updateValue( std::string key, std::string value )
 {
     pairMap[ key ] = value;
+    
+    return HNC_RESULT_SUCCESS;
 }
 
 HNC_RESULT_T 
@@ -174,12 +176,16 @@ HNC_RESULT_T
 HNCSection::updateValue( std::string key, std::string value )
 {
     pairMap[ key ] = value;
+    
+    return HNC_RESULT_SUCCESS;
 }
 
 HNC_RESULT_T 
 HNCSection::clearValue( std::string key )
 {
     pairMap.erase( key );
+    
+    return HNC_RESULT_SUCCESS;
 }
 
 HNC_RESULT_T 
@@ -531,6 +537,7 @@ HNodeConfigFile::loadConfig( std::string baseName, std::string instanceName, HNo
     // Generate the path extension
     if( generatePathExtension( baseName, instanceName, pext ) != HNC_RESULT_SUCCESS )
     {
+        std::cerr << "ERROR: Failed to generate path extension." << std::endl;
         return HNC_RESULT_FAILURE;
     }
 
@@ -547,6 +554,7 @@ HNodeConfigFile::loadConfig( std::string baseName, std::string instanceName, HNo
 
     if( file.exists() == false || file.isFile() == false )
     {
+        std::cerr << "ERROR: Failed to find file: " << tpath.toString() << std::endl;    
         return HNC_RESULT_FAILURE;
     }
 
@@ -556,6 +564,7 @@ HNodeConfigFile::loadConfig( std::string baseName, std::string instanceName, HNo
 
     if( its.is_open() == false )
     {
+        std::cerr << "ERROR: Failed to open file: " << tpath.toString() << std::endl;    
         return HNC_RESULT_FAILURE;
     }
 
@@ -634,9 +643,11 @@ HNodeConfigFile::loadConfig( std::string baseName, std::string instanceName, HNo
     }
     catch( Poco::Exception ex )
     {
+        std::cerr << "ERROR: " << ex.displayText() << std::endl;    
         return HNC_RESULT_FAILURE;
     }
     
+    return HNC_RESULT_SUCCESS;
 
 #if 0
     std::string json = "{ \"test\" : { \"property\" : \"value\" } }";
