@@ -141,7 +141,7 @@ HNEPLoop::addFDToEPoll( int sfd )
     }
 
     event.data.fd = sfd;
-    event.events = EPOLLIN | EPOLLET;
+    event.events = EPOLLIN;
     s = epoll_ctl( m_epollFD, EPOLL_CTL_ADD, sfd, &event );
     if( s == -1 )
     {

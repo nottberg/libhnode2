@@ -173,7 +173,7 @@ HNReqWaitQueue::aquireRecord()
 
     // Read the eventFD, which will decrement the count by 1.
     read( eventFD, &buf, sizeof(buf) ); 
-    
+
     // Grab the front element from the queue
     rtnObj = postQueue.front();
     postQueue.pop_front();
