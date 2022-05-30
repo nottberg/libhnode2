@@ -45,6 +45,10 @@ class HNAvahiBrowserEvent
 
         std::string getTxtValue( std::string key );
 
+        std::string getHostname();
+        std::string getAddress();
+        uint16_t    getPort();
+        
         void debugPrint();
 };
 
