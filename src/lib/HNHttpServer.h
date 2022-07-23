@@ -11,6 +11,9 @@ class HNHttpServer
         HNHttpServer();
        ~HNHttpServer();
 
+        void setPort(uint16_t port);
+        uint16_t getPort();
+        
         void registerEndpointsFromOpenAPI( std::string dispatchID, HNRestDispatchInterface *dispatchInf, std::string openAPIJson );
 
         void start();

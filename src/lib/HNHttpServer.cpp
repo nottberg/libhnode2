@@ -129,6 +129,18 @@ HNHttpServer::~HNHttpServer()
         delete ((Poco::Net::HTTPServer*)m_srvPtr);
 }
 
+void 
+HNHttpServer::setPort(uint16_t port)
+{
+    m_port = port;
+}
+
+uint16_t 
+HNHttpServer::getPort()
+{
+    return m_port;
+}
+
 void
 HNHttpServer::registerEndpointsFromOpenAPI( std::string dispatchID, HNRestDispatchInterface *dispatchInf, std::string openAPIJson )
 {

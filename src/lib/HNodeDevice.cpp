@@ -208,6 +208,18 @@ HNodeDevice::setInstance( std::string value )
     m_devInstance = value;
 }
 
+void 
+HNodeDevice::setName( std::string value )
+{
+    m_name = value;
+}
+
+void 
+HNodeDevice::setPort( uint16_t port )
+{
+    m_port = port;
+}
+
 std::string 
 HNodeDevice::getDeviceType()
 {
@@ -240,16 +252,16 @@ HNodeDevice::getHNodeIDCRC32Str()
     return m_hnodeID.getCRC32AsHexStr();
 }
 
-void 
-HNodeDevice::setName( std::string value )
-{
-    m_name = value;
-}
-
 std::string
 HNodeDevice::getName()
 {
     return m_name;
+}
+
+uint16_t
+HNodeDevice::getPort()
+{
+    return m_port;
 }
 
 std::string 
@@ -293,6 +305,8 @@ HNodeDevice::initConfigSections( HNodeConfig &cfg )
 
     // Create default name
     secPtr->updateValue( "name", "InitialName" );
+
+    return HND_RESULT_SUCCESS;
 }
 
 HND_RESULT_T 
@@ -310,6 +324,8 @@ HNodeDevice::updateConfigSections( HNodeConfig &cfg )
 
     // Update the name
     secPtr->updateValue( "name", getName() );
+
+    return HND_RESULT_SUCCESS;
 }
 
 HND_RESULT_T 
@@ -475,6 +491,7 @@ HNodeDevice::start()
 
     std::cout << "Started HNAvahi..." << std::endl;
 
+    m_rest.setPort( m_port );
     m_rest.start();
 }
 

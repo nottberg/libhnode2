@@ -444,6 +444,24 @@ HNAvahiBrowserEvent::getTxtValue( std::string key )
     return it->second;    
 }
 
+std::string 
+HNAvahiBrowserEvent::getHostname()
+{
+    return hostname;
+}
+
+std::string 
+HNAvahiBrowserEvent::getAddress()
+{
+    return address;
+}
+
+uint16_t    
+HNAvahiBrowserEvent::getPort()
+{
+    return port;
+}
+
 void 
 HNAvahiBrowserEvent::debugPrint()
 {
