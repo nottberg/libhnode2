@@ -17,6 +17,7 @@
 #include "HNAvahiBrowser.h"
 #include "HNodeID.h"
 #include "HNodeConfig.h"
+#include "HNFormatStrs.h"
 
 #define MAXEVENTS 8
 
@@ -29,6 +30,7 @@ class HNode2TestApp : public Poco::Util::Application
         bool _avahiBrowserTest;
         bool _hnodeIDTest;
         bool _hnodeConfigTest;
+        bool _formatStrsTest;
 
     protected:
         void initialize( Poco::Util::Application& application )
@@ -50,6 +52,7 @@ class HNode2TestApp : public Poco::Util::Application
             _avahiBrowserTest = false;
             _hnodeIDTest      = false;
             _hnodeConfigTest  = false;
+            _formatStrsTest   = false;
 
             Poco::Util::Application::defineOptions( optionSet );
 
@@ -75,6 +78,10 @@ class HNode2TestApp : public Poco::Util::Application
 
             optionSet.addOption(
                 Poco::Util::Option( "hnodecfg", "c", "Run HNodeConfig test." ).callback( Poco::Util::OptionCallback<HNode2TestApp>(this, &HNode2TestApp::handleTest ) )
+            );
+
+            optionSet.addOption(
+                Poco::Util::Option( "formatstr", "f", "Run FormatStr test." ).callback( Poco::Util::OptionCallback<HNode2TestApp>(this, &HNode2TestApp::handleTest ) )
             );
 
         }
@@ -110,6 +117,8 @@ class HNode2TestApp : public Poco::Util::Application
                 _hnodeIDTest = true;
             else if( name == "hnodecfg" )
                 _hnodeConfigTest = true;
+            else if( name == "formatstr" )
+                _formatStrsTest = true;
 
         }
 
@@ -297,6 +306,23 @@ class HNode2TestApp : public Poco::Util::Application
                 }
 
                 cfg2.debugPrint(2);
+            }
+            else if( _formatStrsTest == true )
+            {
+                std::cout << "Running HNFormatStrs test..." << std::endl;
+
+                HNFormatStringStore  strStore;
+
+                uint msgcode = 0;
+                HNFS_RESULT_T result = strStore.registerFormatString( "Format Test string: %d, with %s, and 0x%2x, finally %1.2f", msgcode );
+
+                std::cout << "registerFormatString result: " << result << " with message code: " << msgcode << std::endl;
+
+                HNFSInstance instance;
+
+                strStore.fillInstance( msgcode, instance, 20, "Test 1", 16, 4.556 );
+
+                std::cout << "Instance Result Str: " << instance.getResultStr() << std::endl;
             }
 
             //std::cout << "We are now in main. Option is " << this->config().getString( "optionval" ) << std::endl;

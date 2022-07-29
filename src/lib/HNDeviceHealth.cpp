@@ -1,7 +1,11 @@
+#include <cstdarg>
+#include <cstdio>
+
 #include <Poco/Checksum.h>
 
 #include "HNDeviceHealth.h"
 
+/*
 HNDHFormatStr::HNDHFormatStr( uint code, std::string formatStr )
 {
     m_code = code;
@@ -12,6 +16,7 @@ HNDHFormatStr::~HNDHFormatStr()
 {
 
 }
+*/
 
 HNDHComponent::HNDHComponent( std::string compID, std::string componentName )
 {
@@ -21,8 +26,6 @@ HNDHComponent::HNDHComponent( std::string compID, std::string componentName )
     m_stdStatus = HNDH_CSTAT_UNKNOWN;
 
     m_errCode  = 0;
-    m_msgCode  = 0;
-    m_noteCode = 0;
 }
 
 HNDHComponent::~HNDHComponent()
@@ -37,16 +40,57 @@ HNDHComponent::clear()
     m_compName.clear();
     m_stdStatus = HNDH_CSTAT_UNKNOWN;
     m_errCode = 0;
-    m_msgCode = 0;
-    m_msgParams.clear();
-    m_noteCode = 0;
-    m_noteParams.clear();
+    m_parentID.clear();
+    m_msgInstance.clear();
+    m_noteInstance.clear();
 }
 
-HNDeviceHealth::HNDeviceHealth()
+void 
+HNDHComponent::setStatus( HNDH_CSTAT_T status )
+{
+    m_stdStatus = status;
+}
+
+void 
+HNDHComponent::setErrorCode( unsigned int code )
+{
+    m_errCode = code;
+}
+
+void
+HNDHComponent::setParentID( std::string parentID )
+{
+    m_parentID = parentID;
+}
+
+void
+HNDHComponent::clearMsgInstance()
+{
+    m_msgInstance.clear();
+}
+
+HNFSInstance&
+HNDHComponent::getMsgInstanceRef()
+{
+    return m_msgInstance;
+}
+
+void
+HNDHComponent::clearNoteInstance()
+{
+    m_noteInstance.clear();
+}
+
+HNFSInstance&
+HNDHComponent::getNoteInstanceRef()
+{
+    return m_noteInstance;
+}
+
+HNDeviceHealth::HNDeviceHealth( HNFormatStringStore *stringStore )
 : m_devStatus( "Device Overall Health", "c0")
 {
-
+    m_stringStore = stringStore;
 }
 
 HNDeviceHealth::~HNDeviceHealth()
@@ -59,30 +103,21 @@ HNDeviceHealth::clear()
 {
     m_devStatus.clear();
     m_compStatus.clear();
-    m_formatStrs.clear();
 }
 
+/*
 HNDH_RESULT_T 
 HNDeviceHealth::registerMsgFormat( std::string formatStr, uint &msgCode )
 {
-    // Calculate a crc32 for the format string code
-    Poco::Checksum sum;
-    sum.update( (const char *) formatStr.c_str(), formatStr.size() );
-    msgCode = sum.checksum();
+    if( m_stringStore == NULL )
+        return HNDH_RESULT_FAILURE;
 
-    // Look for an existing entry 
-    std::map<uint, HNDHFormatStr>::iterator it = m_formatStrs.find( msgCode );
-
-    // If no entry found then add this string
-    if( it == m_formatStrs.end() )
-    {
-        HNDHFormatStr newFS( msgCode, formatStr );
-
-        m_formatStrs.insert( std::pair<uint, HNDHFormatStr>(msgCode, newFS) );
-    }
+    if( m_stringStore->registerFormatString( formatStr, msgCode ) != HNFS_RESULT_SUCCESS )
+        return HNDH_RESULT_FAILURE;
 
     return HNDH_RESULT_SUCCESS;
 }
+*/
 
 HNDH_RESULT_T 
 HNDeviceHealth::registerComponent( std::string componentName, std::string parentID, std::string &compID )
@@ -103,6 +138,9 @@ HNDeviceHealth::registerComponent( std::string componentName, std::string parent
 
     HNDHComponent *newComp = new HNDHComponent( compID, componentName );
 
+    if( parentID.empty() == false )
+        newComp->setParentID( parentID );
+
     m_compStatus.insert( std::pair<std::string, HNDHComponent*>( compID, newComp ) );
     m_compOrder.push_back( newComp );
 
@@ -112,17 +150,44 @@ HNDeviceHealth::registerComponent( std::string componentName, std::string parent
 void 
 HNDeviceHealth::setDeviceStatus( HNDH_CSTAT_T status )
 {
-
+    m_devStatus.setStatus( status );
 }
 
 void 
-HNDeviceHealth::setDeviceErrMsg( std::string compID, uint errCode, uint fmtCode, ... )
+HNDeviceHealth::setDeviceErrMsg( uint errCode, uint fmtCode, ... )
 {
+    char errBuf[512];
+    va_list vargs;
+
+    if( m_stringStore == NULL )
+        return;
+
+    va_start( vargs, fmtCode );
+
+    m_devStatus.setErrorCode( errCode );
+
+    m_stringStore->fillInstance( fmtCode, vargs, m_devStatus.getMsgInstanceRef() );
+
+    va_end( vargs );
+
+/*
+    std::map<uint, HNDHFormatStr>::iterator it = m_formatStrs.find( fmtCode );
+
+    if( it == m_formatStrs.end() )
+        return;
+
+    va_start( args, it->second.getFormatStr().c_str() );
+    vsnprintf( errBuf, sizeof(errBuf), it->second.getFormatStr().c_str(), args );
+    va_end(args);
+    
+    m_devStatus.setErrMsgCode( fmtCode );
+    m_devStatus.setErrStr( errBuf );
+*/
 
 }
 
 void 
-HNDeviceHealth::setDeviceNote( std::string compID, uint fmtCode, ... )
+HNDeviceHealth::setDeviceNote( uint fmtCode, ... )
 {
 
 }

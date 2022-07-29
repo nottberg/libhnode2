@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include "HNFormatStrs.h"
 
 typedef enum HNDeviceHealthResultEnum {
     HNDH_RESULT_SUCCESS,
@@ -36,6 +37,17 @@ class HNDHComponent
 
         void clear();
 
+        void setStatus( HNDH_CSTAT_T status );
+        void setErrorCode( uint code );
+
+        void setParentID( std::string parentID );
+
+        void clearMsgInstance();
+        HNFSInstance& getMsgInstanceRef();
+
+        void clearNoteInstance();
+        HNFSInstance& getNoteInstanceRef();
+
     private:
         std::string m_compID;
         std::string m_compName;
@@ -44,11 +56,9 @@ class HNDHComponent
 
         uint m_errCode;
 
-        uint m_msgCode;
-        std::vector< std::string > m_msgParams;
+        HNFSInstance m_msgInstance;
 
-        uint m_noteCode;
-        std::vector< std::string > m_noteParams;
+        HNFSInstance m_noteInstance;
 
         std::string m_parentID;
 };
@@ -56,20 +66,20 @@ class HNDHComponent
 class HNDeviceHealth
 {
     public:
-        HNDeviceHealth();
+        HNDeviceHealth( HNFormatStringStore *stringStore );
        ~HNDeviceHealth();
 
         void clear();
 
         // Register a format string to be used for status reporting, returns a code for that string.
-        HNDH_RESULT_T registerMsgFormat( std::string formatStr, uint &msgCode );
+        // HNDH_RESULT_T registerMsgFormat( std::string formatStr, uint &msgCode );
 
         // Register a component that has monitored health status.
         HNDH_RESULT_T registerComponent( std::string componentName, std::string parentID, std::string &compID );
 
         void setDeviceStatus( HNDH_CSTAT_T status );
-        void setDeviceErrMsg( std::string compID, uint errCode, uint fmtCode, ... );
-        void setDeviceNote( std::string compID, uint fmtCode, ... );        
+        void setDeviceErrMsg( uint errCode, uint fmtCode, ... );
+        void setDeviceNote( uint fmtCode, ... );
 
         void setComponentStatus( std::string compID, HNDH_CSTAT_T stdStat );
         void setComponentErrMsg( std::string compID, uint errCode, uint fmtCode, ... );
@@ -84,7 +94,7 @@ class HNDeviceHealth
         std::vector< HNDHComponent* > m_compOrder;
 
         // Registered format strings for status and note messages.
-        std::map< uint, HNDHFormatStr > m_formatStrs;
+        HNFormatStringStore *m_stringStore;
 };
 
 #endif // __HN_DEVICE_HEALTH_H__
