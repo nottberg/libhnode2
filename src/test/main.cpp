@@ -340,6 +340,7 @@ class HNode2TestApp : public Poco::Util::Application
                 HNFormatStringStore  strStore;
                 HNDeviceHealth deviceHealth( &strStore );
 
+                // Register format strings
                 uint warncode = 0;
                 uint troublecode = 0;
                 uint failedcode = 0;
@@ -352,7 +353,8 @@ class HNode2TestApp : public Poco::Util::Application
                 result = strStore.registerFormatString( "Failure: %f", failedcode );
                 std::cout << "registerFormatString result: " << result << " with message code: " << failedcode << std::endl;
 
-                deviceHealth.init( "Irrigation Device" );
+                // Setup component structure
+                deviceHealth.init( "Irrigation Device", HNDH_CSTAT_OK );
 
                 std::string comp1ID;
                 deviceHealth.registerComponent( "comp 1", HNDH_ROOT_COMPID, comp1ID );
@@ -369,18 +371,60 @@ class HNode2TestApp : public Poco::Util::Application
                 std::string comp5ID;
                 deviceHealth.registerComponent( "comp 5", comp4ID, comp5ID );
 
+                // Update cycle 1
+                deviceHealth.startUpdateCycle( time(NULL) );
+
                 deviceHealth.setComponentStatus( HNDH_ROOT_COMPID, HNDH_CSTAT_OK );
                 deviceHealth.setComponentStatus( comp1ID, HNDH_CSTAT_OK );
                 deviceHealth.setComponentStatus( comp2ID, HNDH_CSTAT_OK );
                 deviceHealth.setComponentStatus( comp3ID, HNDH_CSTAT_OK );
                 deviceHealth.setComponentStatus( comp4ID, HNDH_CSTAT_OK );
                 deviceHealth.setComponentStatus( comp5ID, HNDH_CSTAT_OK );
+                
+                bool changed = deviceHealth.completeUpdateCycle();
+
+                std::cout << "Update1 changed: " << changed << std::endl;
 
                 std::string healthJSON;
 
                 deviceHealth.getRestJSON( healthJSON );
 
-                std::cout << "=== HEALTH REST JSON  ===" << std::endl << healthJSON << std::endl;
+                std::cout << "=== HEALTH REST JSON (cycle 1) ===" << std::endl << healthJSON << std::endl;
+
+                // Delay between updates
+                sleep(3);
+
+                // Update cycle 2
+                deviceHealth.startUpdateCycle( time(NULL) );
+
+                deviceHealth.setComponentStatus( comp5ID, HNDH_CSTAT_FAILED );
+                deviceHealth.setComponentErrMsg( comp5ID, 210, failedcode, 3.145 );
+
+                changed = deviceHealth.completeUpdateCycle();
+
+                std::cout << "Update2 changed: " << changed << std::endl;
+
+                deviceHealth.getRestJSON( healthJSON );
+
+                std::cout << "=== HEALTH REST JSON (cycle 2)  ===" << std::endl << healthJSON << std::endl;
+
+
+                // Delay between updates
+                sleep(3);
+
+                // Update cycle 3
+                deviceHealth.startUpdateCycle( time(NULL) );
+
+                deviceHealth.setComponentStatus( comp5ID, HNDH_CSTAT_OK );
+                deviceHealth.clearComponentErrMsg( comp5ID );
+
+                changed = deviceHealth.completeUpdateCycle();
+
+                std::cout << "Update3 changed: " << changed << std::endl;
+
+                deviceHealth.getRestJSON( healthJSON );
+
+                std::cout << "=== HEALTH REST JSON (cycle 3)  ===" << std::endl << healthJSON << std::endl;                 
             }
 
             //std::cout << "We are now in main. Option is " << this->config().getString( "optionval" ) << std::endl;

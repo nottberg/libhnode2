@@ -1,5 +1,6 @@
 #include <cstdarg>
 #include <cstdio>
+#include <mutex>
 
 #include <Poco/JSON/Object.h>
 #include <Poco/JSON/Parser.h>
@@ -88,6 +89,12 @@ HNDHComponent::setParentID( std::string parentID )
     m_parentID = parentID;
 }
 
+void
+HNDHComponent::setUpdateTimestamp( time_t updateTS )
+{
+    m_lastUpdateTS = updateTS;
+}
+
 std::string
 HNDHComponent::getID()
 {
@@ -114,7 +121,7 @@ HNDHComponent::getStatusAsStr()
         case HNDH_CSTAT_UNKNOWN:
             return "UNKNOWN";
         break;
-                
+
         case HNDH_CSTAT_OK:
             return "OK";
         break;
@@ -154,16 +161,18 @@ HNDHComponent::getPropagatedStatusAsStr()
     return "FAILED";
 }
 
-uint
+time_t
 HNDHComponent::getLastUpdateTime()
 {
-    return 0;
+    return m_lastUpdateTS;
 }
 
 std::string
 HNDHComponent::getLastUpdateTimeAsStr()
 {
-    return "";
+    char tmpBuf[128];
+    ctime_r( &m_lastUpdateTS, tmpBuf );
+    return tmpBuf;
 }
 
 uint
@@ -223,6 +232,8 @@ HNDHComponent::getChildListRef()
 HNDeviceHealth::HNDeviceHealth( HNFormatStringStore *stringStore )
 : m_devStatus( HNDH_ROOT_COMPID, "Device Health" )
 {
+    m_lockedForUpdate = false;
+
     m_stringStore = stringStore;
 
     std::cout << "Root ID: " << m_devStatus.getID() << std::endl;
@@ -240,6 +251,8 @@ HNDeviceHealth::clear()
 {
     // Grab the scope lock
     const std::lock_guard< std::mutex > lock( m_accessMutex );
+
+    m_lockedForUpdate = false;
 
     m_compStatus.clear();
     
@@ -282,12 +295,13 @@ HNDeviceHealth::allocUniqueID( std::string &compID )
 }
 
 HNDH_RESULT_T
-HNDeviceHealth::init( std::string componentName )
+HNDeviceHealth::init( std::string componentName, HNDH_CSTAT_T initialStatus )
 {
     // Grab the scope lock
     const std::lock_guard< std::mutex > lock( m_accessMutex );
 
     m_devStatus.setName( componentName );
+    m_devStatus.setStatus( initialStatus );
 
     return HNDH_RESULT_SUCCESS;
 }
@@ -332,8 +346,18 @@ HNDeviceHealth::registerComponent( std::string componentName, std::string parent
 
 // Start a new update cycle
 void
-HNDeviceHealth::startUpdateCycle()
+HNDeviceHealth::startUpdateCycle( time_t updateTimestamp )
 {
+    // Look the access mutex, which will be unlocked with a mandatory
+    // call to completeUpdateCycle() at the end of the update process.
+    m_accessMutex.lock();
+
+    // Allow status updates    
+    m_lockedForUpdate = true;
+
+    // Record the update cycle timestamp
+    m_updateCycleTimestamp = updateTimestamp;
+
     // Track status change
     m_statusChange = false;
 }
@@ -348,6 +372,13 @@ HNDeviceHealth::completeUpdateCycle()
         m_statusChange = true;
     }
 
+    // Don't allow status updates
+    m_lockedForUpdate = false;
+
+    // Release the access mutex since the update operation 
+    // has completed.
+    m_accessMutex.unlock();
+
     // Return whether updates resulted in a status change.
     return m_statusChange;
 }
@@ -356,6 +387,13 @@ void
 HNDeviceHealth::setComponentStatus( std::string compID, HNDH_CSTAT_T stdStatus )
 {
     HNDHComponent *comp;
+
+    // Make sure we are in an update cycle.
+    if( m_lockedForUpdate ==  false )
+    {
+        std::cerr << "ERROR: Health Component Updates must be surrounded by startUpdate, completeUpdate calls." << std::endl;
+        return;
+    }
 
     // Look for an existing entry 
     std::map<std::string, HNDHComponent* >::iterator it = m_compStatus.find( compID );
@@ -371,12 +409,21 @@ HNDeviceHealth::setComponentStatus( std::string compID, HNDH_CSTAT_T stdStatus )
         m_statusChange = true;
         comp->setStatus( stdStatus );
     }
+
+    comp->setUpdateTimestamp( m_updateCycleTimestamp );
 }
 
 void
 HNDeviceHealth::clearComponentErrMsg( std::string compID )
 {
     HNDHComponent *comp;
+
+    // Make sure we are in an update cycle.
+    if( m_lockedForUpdate ==  false )
+    {
+        std::cerr << "ERROR: Health Component Updates must be surrounded by startUpdate, completeUpdate calls." << std::endl;
+        return;
+    }
 
     // Look for an existing entry 
     std::map<std::string, HNDHComponent* >::iterator it = m_compStatus.find( compID );
@@ -397,6 +444,8 @@ HNDeviceHealth::clearComponentErrMsg( std::string compID )
     {
         m_statusChange = true;
     }
+
+    comp->setUpdateTimestamp( m_updateCycleTimestamp );
 }
 
 void
@@ -404,6 +453,13 @@ HNDeviceHealth::setComponentErrMsg( std::string compID, uint errCode, uint fmtCo
 {
     HNDHComponent *comp;
     va_list vargs;
+
+    // Make sure we are in an update cycle.
+    if( m_lockedForUpdate ==  false )
+    {
+        std::cerr << "ERROR: Health Component Updates must be surrounded by startUpdate, completeUpdate calls." << std::endl;
+        return;
+    }
 
     // Look for an existing entry 
     std::map<std::string, HNDHComponent* >::iterator it = m_compStatus.find( compID );
@@ -433,12 +489,21 @@ HNDeviceHealth::setComponentErrMsg( std::string compID, uint errCode, uint fmtCo
     }
 
     va_end( vargs );
+
+    comp->setUpdateTimestamp( m_updateCycleTimestamp );
 }
 
 void
 HNDeviceHealth::clearComponentNote( std::string compID )
 {
     HNDHComponent *comp;
+
+    // Make sure we are in an update cycle.
+    if( m_lockedForUpdate ==  false )
+    {
+        std::cerr << "ERROR: Health Component Updates must be surrounded by startUpdate, completeUpdate calls." << std::endl;
+        return;
+    }
 
     // Look for an existing entry 
     std::map<std::string, HNDHComponent* >::iterator it = m_compStatus.find( compID );
@@ -453,6 +518,8 @@ HNDeviceHealth::clearComponentNote( std::string compID )
     {
         m_statusChange = true;
     }
+
+    comp->setUpdateTimestamp( m_updateCycleTimestamp );
 }
 
 void 
@@ -460,6 +527,13 @@ HNDeviceHealth::setComponentNote( std::string compID, uint fmtCode, ... )
 {
     HNDHComponent *comp;
     va_list vargs;
+
+    // Make sure we are in an update cycle.
+    if( m_lockedForUpdate ==  false )
+    {
+        std::cerr << "ERROR: Health Component Updates must be surrounded by startUpdate, completeUpdate calls." << std::endl;
+        return;
+    }
 
     // Look for an existing entry 
     std::map<std::string, HNDHComponent* >::iterator it = m_compStatus.find( compID );
@@ -483,12 +557,55 @@ HNDeviceHealth::setComponentNote( std::string compID, uint fmtCode, ... )
     }
 
     va_end( vargs );
+
+    comp->setUpdateTimestamp( m_updateCycleTimestamp );
+}
+
+HNDH_CSTAT_T
+HNDeviceHealth::propagateChild( HNDHComponent *comp, bool &changed )
+{
+    HNDH_CSTAT_T calcStatus = comp->getStatus();
+
+    // Do a depth first walk of the tree
+    for( std::vector< HNDHComponent* >::iterator it = comp->getChildListRef().begin(); 
+            it != comp->getChildListRef().end(); 
+                it++ )
+    {
+        HNDH_CSTAT_T childStatus = propagateChild( *it, changed );
+
+        switch( childStatus )
+        {
+            case HNDH_CSTAT_UNKNOWN:
+            case HNDH_CSTAT_DEGRADED:
+            case HNDH_CSTAT_FAILED:
+                calcStatus = HNDH_CSTAT_DEGRADED;
+            break;
+
+            case HNDH_CSTAT_OK:
+            break;
+        }
+    }
+    
+    std::cout << "setStat: " << comp->getStatus() << "  propStat: " << comp->getPropagatedStatus() << "  calcStat:" << calcStatus << std::endl;
+
+    // Set the propogated status for the current child.
+    if( comp->getPropagatedStatus() != calcStatus )
+    {
+        comp->setPropagatedStatus( calcStatus );
+        changed = true;
+    }
+
+    return calcStatus;
 }
 
 bool
 HNDeviceHealth::propagateStatus()
 {
-    return true;
+    bool changed = false;
+
+    propagateChild( &m_devStatus, changed );
+
+    return changed;
 }
 
 HNDH_RESULT_T
@@ -529,7 +646,7 @@ HNDeviceHealth::getRestJSON( std::string &jsonStr )
     // Create a json root object
     pjs::Object jsRoot;
     
-    jsRoot.set( "deviceStatus", m_devStatus.getStatusAsStr() );
+    jsRoot.set( "deviceStatus", m_devStatus.getPropagatedStatusAsStr() );
 
     pjs::Array jsCompList;
     addCompJSONObject( &jsCompList, &m_devStatus );

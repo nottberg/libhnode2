@@ -53,6 +53,8 @@ class HNDHComponent
 
         void setParentID( std::string parentID );
 
+        void setUpdateTimestamp( time_t updateTS );
+
         std::string getID();
         std::string getComponentName();
 
@@ -62,7 +64,7 @@ class HNDHComponent
         HNDH_CSTAT_T getPropagatedStatus();
         std::string getPropagatedStatusAsStr();
 
-        uint getLastUpdateTime();
+        time_t getLastUpdateTime();
         std::string getLastUpdateTimeAsStr();
 
         uint getErrorCode();
@@ -96,6 +98,8 @@ class HNDHComponent
 
         std::string m_parentID;
 
+        time_t m_lastUpdateTS;
+        
         std::vector< HNDHComponent* > m_children;
 };
 
@@ -108,13 +112,13 @@ class HNDeviceHealth
         void clear();
 
         // Initialize the root component
-        HNDH_RESULT_T init( std::string componentName );
+        HNDH_RESULT_T init( std::string componentName, HNDH_CSTAT_T initialStatus );
 
         // Register a component that has monitored health status.
         HNDH_RESULT_T registerComponent( std::string componentName, std::string parentID, std::string &compID );
 
         // Start a new update cycle
-        void startUpdateCycle();
+        void startUpdateCycle( time_t updateTimestamp );
 
         // Complete an update cycle, return whether values changed.
         bool completeUpdateCycle();
@@ -132,6 +136,7 @@ class HNDeviceHealth
     private:
         HNDH_RESULT_T allocUniqueID( std::string &compID );
 
+        HNDH_CSTAT_T propagateChild( HNDHComponent *comp, bool &changed );
         bool propagateStatus();
 
         HNDH_RESULT_T addCompJSONObject( void *listPtr, HNDHComponent *comp );
@@ -144,6 +149,12 @@ class HNDeviceHealth
 
         // Health status for monitored components
         std::map< std::string, HNDHComponent* > m_compStatus;
+
+        // Make sure start-update, complete-update calls wrap set status calls.
+        bool m_lockedForUpdate;
+
+        // Timestamp for current update cycle
+        time_t m_updateCycleTimestamp;
 
         // Tracking variable for status changes
         bool m_statusChange;
