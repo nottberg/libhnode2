@@ -18,6 +18,7 @@
 #include "HNodeID.h"
 #include "HNodeConfig.h"
 #include "HNFormatStrs.h"
+#include "HNDeviceHealth.h"
 
 #define MAXEVENTS 8
 
@@ -31,6 +32,7 @@ class HNode2TestApp : public Poco::Util::Application
         bool _hnodeIDTest;
         bool _hnodeConfigTest;
         bool _formatStrsTest;
+        bool _deviceHealthTest;
 
     protected:
         void initialize( Poco::Util::Application& application )
@@ -53,6 +55,7 @@ class HNode2TestApp : public Poco::Util::Application
             _hnodeIDTest      = false;
             _hnodeConfigTest  = false;
             _formatStrsTest   = false;
+            _deviceHealthTest = false;
 
             Poco::Util::Application::defineOptions( optionSet );
 
@@ -82,6 +85,10 @@ class HNode2TestApp : public Poco::Util::Application
 
             optionSet.addOption(
                 Poco::Util::Option( "formatstr", "f", "Run FormatStr test." ).callback( Poco::Util::OptionCallback<HNode2TestApp>(this, &HNode2TestApp::handleTest ) )
+            );
+
+            optionSet.addOption(
+                Poco::Util::Option( "devicehealth", "x", "Run Device Health test." ).callback( Poco::Util::OptionCallback<HNode2TestApp>(this, &HNode2TestApp::handleTest ) )
             );
 
         }
@@ -119,6 +126,8 @@ class HNode2TestApp : public Poco::Util::Application
                 _hnodeConfigTest = true;
             else if( name == "formatstr" )
                 _formatStrsTest = true;
+            else if( name == "devicehealth" )
+                _deviceHealthTest = true;
 
         }
 
@@ -323,6 +332,55 @@ class HNode2TestApp : public Poco::Util::Application
                 strStore.fillInstance( msgcode, instance, 20, "Test 1", 16, 4.556 );
 
                 std::cout << "Instance Result Str: " << instance.getResultStr() << std::endl;
+            }
+            else if( _deviceHealthTest == true )
+            {
+                std::cout << "Running Device Health test..." << std::endl;
+
+                HNFormatStringStore  strStore;
+                HNDeviceHealth deviceHealth( &strStore );
+
+                uint warncode = 0;
+                uint troublecode = 0;
+                uint failedcode = 0;
+                HNFS_RESULT_T result = strStore.registerFormatString( "Warning: %d", warncode );
+                std::cout << "registerFormatString result: " << result << " with message code: " << warncode << std::endl;
+
+                result = strStore.registerFormatString( "Trouble: %s", troublecode );
+                std::cout << "registerFormatString result: " << result << " with message code: " << troublecode << std::endl;
+
+                result = strStore.registerFormatString( "Failure: %f", failedcode );
+                std::cout << "registerFormatString result: " << result << " with message code: " << failedcode << std::endl;
+
+                deviceHealth.init( "Irrigation Device" );
+
+                std::string comp1ID;
+                deviceHealth.registerComponent( "comp 1", HNDH_ROOT_COMPID, comp1ID );
+
+                std::string comp2ID;
+                deviceHealth.registerComponent( "comp 2", HNDH_ROOT_COMPID, comp2ID );
+
+                std::string comp3ID;
+                deviceHealth.registerComponent( "comp 3", comp2ID, comp3ID );
+
+                std::string comp4ID;
+                deviceHealth.registerComponent( "comp 4", comp2ID, comp4ID );
+
+                std::string comp5ID;
+                deviceHealth.registerComponent( "comp 5", comp4ID, comp5ID );
+
+                deviceHealth.setComponentStatus( HNDH_ROOT_COMPID, HNDH_CSTAT_OK );
+                deviceHealth.setComponentStatus( comp1ID, HNDH_CSTAT_OK );
+                deviceHealth.setComponentStatus( comp2ID, HNDH_CSTAT_OK );
+                deviceHealth.setComponentStatus( comp3ID, HNDH_CSTAT_OK );
+                deviceHealth.setComponentStatus( comp4ID, HNDH_CSTAT_OK );
+                deviceHealth.setComponentStatus( comp5ID, HNDH_CSTAT_OK );
+
+                std::string healthJSON;
+
+                deviceHealth.getRestJSON( healthJSON );
+
+                std::cout << "=== HEALTH REST JSON  ===" << std::endl << healthJSON << std::endl;
             }
 
             //std::cout << "We are now in main. Option is " << this->config().getString( "optionval" ) << std::endl;

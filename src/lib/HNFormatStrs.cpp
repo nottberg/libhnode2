@@ -23,12 +23,25 @@ HNFSInstance::~HNFSInstance()
 
 }
 
-void 
+bool
 HNFSInstance::clear()
 {
+    bool changed = false;
+
+    if( (m_code != 0) || (m_paramList.size() != 0) || (m_resultStr.empty() == false) )
+        changed = true;
+
     m_code = 0;
     m_paramList.clear();
     m_resultStr.clear();
+
+    return changed;
+}
+
+uint
+HNFSInstance::getFmtCode()
+{
+    return m_code;
 }
 
 void
@@ -92,7 +105,7 @@ HNFormatString::validateFormat()
     auto fs_begin = std::sregex_iterator( m_formatStr.begin(), m_formatStr.end(), formatSpecRE );
     auto fs_end = std::sregex_iterator();
  
-    // Put them into the formatSpecs array and temporarily remember thier location the m_formatStr
+    // Put them into the formatSpecs array and temporarily remember thier location in the m_formatStr
     // for later use when building the m_templateStr();
     std::list< std::pair< uint, uint > > locations;
     for( std::sregex_iterator i = fs_begin; i != fs_end; ++i ) 
@@ -121,14 +134,15 @@ HNFormatString::validateFormat()
 HNFS_RESULT_T 
 HNFormatString::applyParameters( va_list vargs, HNFSInstance &instance )
 {
-    char tmpBuf[4096];
-    char pName[64];
-
+    char        tmpBuf[4096];
+    std::string builtStr;
+    char        pName[64];
+    bool        changed = false;
+ 
     std::vector< std::string > &paramList = instance.getParamListRef();
-    std::string &resultStr = instance.getResultStrRef();
 
     paramList.clear();
-    resultStr = m_templateStr;
+    builtStr = m_templateStr;
 
     for( uint pindx = 0; pindx < m_formatSpecs.size(); pindx++ )
     {
@@ -136,8 +150,21 @@ HNFormatString::applyParameters( va_list vargs, HNFSInstance &instance )
         paramList.push_back( tmpBuf );
 
         uint pLen = sprintf( pName, "{%u}", pindx );
-        size_t pos = resultStr.find( pName );
-        resultStr.replace( pos, pLen, tmpBuf );
+        size_t pos = builtStr.find( pName );
+        builtStr.replace( pos, pLen, tmpBuf );
+    }
+
+    std::string &resultStr = instance.getResultStrRef();
+
+    if( resultStr.size() != builtStr.size() )
+    {
+        resultStr = builtStr;
+        return HNFS_RESULT_SUCCESS_CHANGED;
+    }
+    else if( resultStr != builtStr )
+    {
+        resultStr = builtStr;
+        return HNFS_RESULT_SUCCESS_CHANGED;
     }
 
     return HNFS_RESULT_SUCCESS;
@@ -180,9 +207,11 @@ HNFormatStringStore::registerFormatString( std::string formatStr, uint &code )
     return HNFS_RESULT_SUCCESS;
 }
 
-HNFS_RESULT_T 
+HNFS_RESULT_T
 HNFormatStringStore::fillInstance( uint fmtCode, va_list vargs, HNFSInstance &instance )
 {
+    bool changed = false;
+
     instance.clear();
 
     // Look up the format string
@@ -194,34 +223,31 @@ HNFormatStringStore::fillInstance( uint fmtCode, va_list vargs, HNFSInstance &in
     }
 
     // Set the instance string code
-    instance.setFmtCode( fmtCode );
+    if( instance.getFmtCode() != fmtCode )
+    {
+        instance.setFmtCode( fmtCode );
+        changed = true;
+    }
 
     // Format the parameters to strings
-    it->second.applyParameters( vargs, instance );
+    if( it->second.applyParameters( vargs, instance ) == HNFS_RESULT_SUCCESS_CHANGED )
+    {
+        changed = true;
+    }
 
-    return HNFS_RESULT_SUCCESS;
+    return (changed == true) ? HNFS_RESULT_SUCCESS_CHANGED : HNFS_RESULT_SUCCESS;
 }
 
-HNFS_RESULT_T 
+HNFS_RESULT_T
 HNFormatStringStore::fillInstance( uint fmtCode, HNFSInstance &instance, ... )
 {
     va_list vargs;
-    
-    // Look up the format string
-    std::map< uint, HNFormatString >::iterator it = m_formatStrs.find( fmtCode );
-
-    if( it == m_formatStrs.end() )
-    {
-        return HNFS_RESULT_FAILURE;
-    }
-
-    // Set the instance string code
-    instance.setFmtCode( fmtCode );
+    HNFS_RESULT_T result = HNFS_RESULT_FAILURE;
 
     // Format the parameters to strings
-    va_start( vargs, instance );    
-    it->second.applyParameters( vargs, instance );
+    va_start( vargs, instance );
+    result = fillInstance( fmtCode, vargs, instance );
     va_end( vargs );
 
-    return HNFS_RESULT_SUCCESS;
+    return result;
 }

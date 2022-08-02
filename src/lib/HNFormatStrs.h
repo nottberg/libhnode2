@@ -10,6 +10,7 @@ class HNFormatString;
 
 typedef enum HNFormatStrsResultEnum {
     HNFS_RESULT_SUCCESS,
+    HNFS_RESULT_SUCCESS_CHANGED,
     HNFS_RESULT_FAILURE
 }HNFS_RESULT_T;
 
@@ -20,8 +21,10 @@ class HNFSInstance
         HNFSInstance( uint code );
        ~HNFSInstance();
 
-        void clear();
+        bool clear();
         
+        uint getFmtCode();
+
         void setFmtCode( uint code );
 
         std::string getResultStr();

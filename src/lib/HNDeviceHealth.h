@@ -4,7 +4,11 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <mutex>
+
 #include "HNFormatStrs.h"
+
+#define HNDH_ROOT_COMPID  "c0"
 
 typedef enum HNDeviceHealthResultEnum {
     HNDH_RESULT_SUCCESS,
@@ -36,11 +40,35 @@ class HNDHComponent
        ~HNDHComponent(); 
 
         void clear();
+       
+        void setID( std::string idStr );
+
+        void setName( std::string compName );
 
         void setStatus( HNDH_CSTAT_T status );
+
+        void setPropagatedStatus( HNDH_CSTAT_T status );
+
         void setErrorCode( uint code );
 
         void setParentID( std::string parentID );
+
+        std::string getID();
+        std::string getComponentName();
+
+        HNDH_CSTAT_T getStatus();
+        std::string getStatusAsStr();
+
+        HNDH_CSTAT_T getPropagatedStatus();
+        std::string getPropagatedStatusAsStr();
+
+        uint getLastUpdateTime();
+        std::string getLastUpdateTimeAsStr();
+
+        uint getErrorCode();
+        
+        std::string getRenderedMsg();
+        std::string getRenderedNote();
 
         void clearMsgInstance();
         HNFSInstance& getMsgInstanceRef();
@@ -48,11 +76,17 @@ class HNDHComponent
         void clearNoteInstance();
         HNFSInstance& getNoteInstanceRef();
 
+        void addChildComponent( HNDHComponent *childComp );
+
+        std::vector< HNDHComponent* >& getChildListRef();
+
     private:
         std::string m_compID;
         std::string m_compName;
 
         HNDH_CSTAT_T m_stdStatus;
+
+        HNDH_CSTAT_T m_propagatedStatus;
 
         uint m_errCode;
 
@@ -61,6 +95,8 @@ class HNDHComponent
         HNFSInstance m_noteInstance;
 
         std::string m_parentID;
+
+        std::vector< HNDHComponent* > m_children;
 };
 
 class HNDeviceHealth
@@ -71,29 +107,48 @@ class HNDeviceHealth
 
         void clear();
 
-        // Register a format string to be used for status reporting, returns a code for that string.
-        // HNDH_RESULT_T registerMsgFormat( std::string formatStr, uint &msgCode );
+        // Initialize the root component
+        HNDH_RESULT_T init( std::string componentName );
 
         // Register a component that has monitored health status.
         HNDH_RESULT_T registerComponent( std::string componentName, std::string parentID, std::string &compID );
 
-        void setDeviceStatus( HNDH_CSTAT_T status );
-        void setDeviceErrMsg( uint errCode, uint fmtCode, ... );
-        void setDeviceNote( uint fmtCode, ... );
+        // Start a new update cycle
+        void startUpdateCycle();
 
-        void setComponentStatus( std::string compID, HNDH_CSTAT_T stdStat );
+        // Complete an update cycle, return whether values changed.
+        bool completeUpdateCycle();
+
+        void setComponentStatus( std::string compID, HNDH_CSTAT_T stdStatus );
+
+        void clearComponentErrMsg( std::string compID );
         void setComponentErrMsg( std::string compID, uint errCode, uint fmtCode, ... );
+
+        void clearComponentNote( std::string compID );
         void setComponentNote( std::string compID, uint fmtCode, ... );
 
+        HNDH_RESULT_T getRestJSON( std::string &jsonStr );
+
     private:
-        // Health status for overall device 
+        HNDH_RESULT_T allocUniqueID( std::string &compID );
+
+        bool propagateStatus();
+
+        HNDH_RESULT_T addCompJSONObject( void *listPtr, HNDHComponent *comp );
+
+        // Guard for multi-threaded access to health data.
+        std::mutex m_accessMutex;
+
+        // Root of health status tree 
         HNDHComponent m_devStatus;
 
         // Health status for monitored components
         std::map< std::string, HNDHComponent* > m_compStatus;
-        std::vector< HNDHComponent* > m_compOrder;
 
-        // Registered format strings for status and note messages.
+        // Tracking variable for status changes
+        bool m_statusChange;
+
+        // Access to registered format strings for status and note messages.
         HNFormatStringStore *m_stringStore;
 };
 
