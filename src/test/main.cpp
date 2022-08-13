@@ -354,7 +354,7 @@ class HNode2TestApp : public Poco::Util::Application
                 std::cout << "registerFormatString result: " << result << " with message code: " << failedcode << std::endl;
 
                 // Setup component structure
-                deviceHealth.init( "Irrigation Device", HNDH_CSTAT_OK );
+                deviceHealth.init( "hnode-test-util-bc453423-name", "bc453423", "Irrigation Device" );
 
                 std::string comp1ID;
                 deviceHealth.registerComponent( "comp 1", HNDH_ROOT_COMPID, comp1ID );

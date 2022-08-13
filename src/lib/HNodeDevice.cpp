@@ -11,85 +11,8 @@
 namespace pjs = Poco::JSON;
 namespace pdy = Poco::Dynamic;
 
-const std::string g_HNode2DeviceRest = R"(
-{
-  "openapi": "3.0.0",
-  "info": {
-    "description": "",
-    "version": "1.0.0",
-    "title": ""
-  },
-  "paths": {
-    "/hnode2/device/info": {
-      "get": {
-        "summary": "Get basic information about the device.",
-        "operationId": "getDeviceInfo",
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid status value"
-          }
-        }
-      }
-    },
-
-    "/hnode2/device/owner": {
-      "get": {
-        "summary": "Get information about the owner of this device.",
-        "operationId": "getDeviceOwner",
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid status value"
-          }
-        }
-      }
-    },
-
-    "/hnode2/device/endpoint/{epIndx}": {
-      "get": {
-        "summary": "Get information for a specific endpoint.",
-        "operationId": "getSpecificEndpoint",
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid status value"
-          }
-        }
-      }
-    }
-
-  }
-}
-)";
-
+// Forward declaration
+extern const std::string g_HNode2DeviceRest;
 
 HNDEndpoint::HNDEndpoint()
 {
@@ -156,6 +79,7 @@ HNDEndpoint::getOpenAPIJson()
 }
 
 HNodeDevice::HNodeDevice()
+: m_health( &m_stringStore )
 {
     m_devType     = "hnode2-default-device";
     m_devInstance = "default";
@@ -174,6 +98,7 @@ HNodeDevice::HNodeDevice()
 }
 
 HNodeDevice::HNodeDevice( std::string deviceType, std::string instance )
+: m_health( &m_stringStore )
 {
     m_devType     = deviceType;
     m_devInstance = instance;
@@ -447,6 +372,34 @@ HNodeDevice::initToDefaults()
 }
 #endif
 
+HND_RESULT_T
+HNodeDevice::registerFormatString( std::string formatStr, uint &code )
+{
+    if( m_stringStore.registerFormatString( formatStr, code ) != HNFS_RESULT_SUCCESS )
+      return HND_RESULT_FAILURE;
+
+    return HND_RESULT_SUCCESS;
+}
+
+HND_RESULT_T
+HNodeDevice::enableHealthMonitoring()
+{
+    m_health.setEnabled(); 
+    return HND_RESULT_SUCCESS;
+}
+
+void
+HNodeDevice::disableHealthMonitoring()
+{
+    m_health.clear();
+}
+
+HNDeviceHealth& 
+HNodeDevice::getHealthRef()
+{
+    return m_health;
+}
+
 HND_RESULT_T 
 HNodeDevice::addEndpoint( HNDEndpoint newEP )
 {
@@ -490,6 +443,9 @@ HNodeDevice::start()
     m_avObj.start();
 
     std::cout << "Started HNAvahi..." << std::endl;
+
+    if( m_health.isEnabled() == true )
+        m_health.init( createAvahiName(), m_hnodeID.getCRC32AsHexStr(), getName() );
 
     m_rest.setPort( m_port );
     m_rest.start();
@@ -559,6 +515,28 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
             return;
         }
     }
+    else if( "getDeviceHealth" == opID )
+    {
+        HNDH_RESULT_T result;
+
+        opData->responseSetChunkedTransferEncoding(true);
+        opData->responseSetContentType("application/json");
+
+        // Render the response
+        std::ostream& ostr = opData->responseSend();
+        result = m_health.getRestJSON( ostr );
+
+        if( result != HNDH_RESULT_SUCCESS )
+        {
+            opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
+            return;
+        }
+    }
+    else if( "getDeviceHealthComponent" == opID )
+    {
+        // FIXME Send back not implemented
+        opData->responseSetStatusAndReason( HNR_HTTP_NOT_IMPLEMENTED );
+    }
     else
     {
         // Send back not implemented
@@ -586,3 +564,125 @@ HNodeDevice::restDispatch( HNOperationData *opData )
     it->second.getDispatchPtr()->dispatchEP( this, opData );
 }
 
+const std::string g_HNode2DeviceRest = R"(
+{
+  "openapi": "3.0.0",
+  "info": {
+    "description": "",
+    "version": "1.0.0",
+    "title": ""
+  },
+  "paths": {
+    "/hnode2/device/info": {
+      "get": {
+        "summary": "Get basic information about the device.",
+        "operationId": "getDeviceInfo",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      }
+    },
+
+    "/hnode2/device/owner": {
+      "get": {
+        "summary": "Get information about the owner of this device.",
+        "operationId": "getDeviceOwner",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      }
+    },
+
+    "/hnode2/device/health": {
+      "get": {
+        "summary": "Get health monitoring status for this device.",
+        "operationId": "getDeviceHealth",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      }
+    },
+
+    "/hnode2/device/health/{compID}": {
+      "get": {
+        "summary": "Get health monitoring status for a single component.",
+        "operationId": "getDeviceHealthComponent",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      }
+    },
+
+    "/hnode2/device/endpoint/{epIndx}": {
+      "get": {
+        "summary": "Get information for a specific endpoint.",
+        "operationId": "getSpecificEndpoint",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      }
+    }
+
+  }
+}
+)";

@@ -109,10 +109,13 @@ class HNDeviceHealth
         HNDeviceHealth( HNFormatStringStore *stringStore );
        ~HNDeviceHealth();
 
+        void setEnabled();
+        bool isEnabled();
+
         void clear();
 
         // Initialize the root component
-        HNDH_RESULT_T init( std::string componentName, HNDH_CSTAT_T initialStatus );
+        HNDH_RESULT_T init( std::string deviceID, std::string deviceCRC32, std::string deviceName );
 
         // Register a component that has monitored health status.
         HNDH_RESULT_T registerComponent( std::string componentName, std::string parentID, std::string &compID );
@@ -132,6 +135,7 @@ class HNDeviceHealth
         void setComponentNote( std::string compID, uint fmtCode, ... );
 
         HNDH_RESULT_T getRestJSON( std::string &jsonStr );
+        HNDH_RESULT_T getRestJSON( std::ostream &oStream );
 
     private:
         HNDH_RESULT_T allocUniqueID( std::string &compID );
@@ -143,6 +147,13 @@ class HNDeviceHealth
 
         // Guard for multi-threaded access to health data.
         std::mutex m_accessMutex;
+
+        // Is device health reporting enabled.
+        bool m_enabled;
+
+        // The device ID
+        std::string m_deviceID;
+        std::string m_deviceCRC32;
 
         // Root of health status tree 
         HNDHComponent m_devStatus;

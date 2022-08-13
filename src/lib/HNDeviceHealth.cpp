@@ -232,6 +232,8 @@ HNDHComponent::getChildListRef()
 HNDeviceHealth::HNDeviceHealth( HNFormatStringStore *stringStore )
 : m_devStatus( HNDH_ROOT_COMPID, "Device Health" )
 {
+    m_enabled = false;
+
     m_lockedForUpdate = false;
 
     m_stringStore = stringStore;
@@ -244,6 +246,18 @@ HNDeviceHealth::HNDeviceHealth( HNFormatStringStore *stringStore )
 HNDeviceHealth::~HNDeviceHealth()
 {
 
+}
+
+void 
+HNDeviceHealth::setEnabled()
+{
+    m_enabled = true;
+}
+
+bool 
+HNDeviceHealth::isEnabled()
+{
+    return m_enabled;
 }
 
 void 
@@ -263,6 +277,8 @@ HNDeviceHealth::clear()
     std::cout << "Root ID 2: " << m_devStatus.getID() << std::endl;
 
     m_compStatus.insert( std::pair< std::string, HNDHComponent* >( m_devStatus.getID(), &m_devStatus ) );
+
+    m_enabled = false;
 }
 
 HNDH_RESULT_T 
@@ -295,13 +311,16 @@ HNDeviceHealth::allocUniqueID( std::string &compID )
 }
 
 HNDH_RESULT_T
-HNDeviceHealth::init( std::string componentName, HNDH_CSTAT_T initialStatus )
+HNDeviceHealth::init( std::string deviceID, std::string deviceCRC32, std::string deviceName )
 {
     // Grab the scope lock
     const std::lock_guard< std::mutex > lock( m_accessMutex );
 
-    m_devStatus.setName( componentName );
-    m_devStatus.setStatus( initialStatus );
+    m_deviceID    = deviceID;
+    m_deviceCRC32 = deviceCRC32;
+
+    m_devStatus.setName( deviceName );
+    m_devStatus.setStatus( HNDH_CSTAT_UNKNOWN );
 
     return HNDH_RESULT_SUCCESS;
 }
@@ -638,34 +657,54 @@ HNDeviceHealth::addCompJSONObject( void *listPtr, HNDHComponent *comp )
 HNDH_RESULT_T 
 HNDeviceHealth::getRestJSON( std::string &jsonStr )
 {
-    // Grab the scope lock
-    const std::lock_guard< std::mutex > lock( m_accessMutex );
+    HNDH_RESULT_T result;
+    std::ostringstream ostr;
 
     jsonStr.clear();
+
+    result = getRestJSON( ostr );
+
+    if( result != HNDH_RESULT_SUCCESS )
+        return result;
+
+    jsonStr = ostr.str();
+
+    return HNDH_RESULT_SUCCESS;
+}
+
+HNDH_RESULT_T 
+HNDeviceHealth::getRestJSON( std::ostream &oStream )
+{
+    // Grab the scope lock
+    const std::lock_guard< std::mutex > lock( m_accessMutex );
 
     // Create a json root object
     pjs::Object jsRoot;
     
-    jsRoot.set( "deviceStatus", m_devStatus.getPropagatedStatusAsStr() );
+    jsRoot.set( "enabled", m_enabled );
 
-    pjs::Array jsCompList;
-    addCompJSONObject( &jsCompList, &m_devStatus );
+    if( m_enabled == true )
+    {
+        jsRoot.set( "deviceStatus", m_devStatus.getPropagatedStatusAsStr() );
+        jsRoot.set( "deviceID", m_deviceID );
+        jsRoot.set( "deviceCRC32", m_deviceCRC32 );
 
-    jsRoot.set( "components", jsCompList );
+        pjs::Array jsCompList;
+        addCompJSONObject( &jsCompList, &m_devStatus );
+
+        jsRoot.set( "components", jsCompList );
+    }
 
     // Render the response
-    std::ostringstream ostr;
     try
     {
         // Write out the generated json
-        pjs::Stringifier::stringify( jsRoot, ostr, 1 );
+        pjs::Stringifier::stringify( jsRoot, oStream, 1 );
     }
     catch( ... )
     {
         return HNDH_RESULT_FAILURE;
     }
-
-    jsonStr = ostr.str();
 
     return HNDH_RESULT_SUCCESS;
 }

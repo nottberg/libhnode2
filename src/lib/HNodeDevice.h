@@ -7,6 +7,8 @@
 #include "HNAvahi.h"
 #include "HNHttpServer.h"
 #include "HNodeConfig.h"
+#include "HNFormatStrs.h"
+#include "HNDeviceHealth.h"
 
 #define HNODE_DEVICE_AVAHI_TYPE  "_hnode2-rest-http._tcp"
 #define HND_CFGFILE_ROOT_DEFAULT  "/var/cache/hnode2/"
@@ -83,6 +85,10 @@ class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
 
         HNHttpServer m_rest;
 
+        HNFormatStringStore m_stringStore;
+
+        HNDeviceHealth m_health;
+
         std::string createAvahiName();
 
         //bool configExists();
@@ -119,6 +125,15 @@ class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
 
         //void initToDefaults();
 
+        // Register format strings for use by health monitoring and logging
+        HND_RESULT_T registerFormatString( std::string formatStr, uint &code );
+
+        // Initialize the Health Monitoring
+        HND_RESULT_T enableHealthMonitoring();
+        void disableHealthMonitoring();
+        HNDeviceHealth& getHealthRef();
+
+        // Add a REST endpoint.
         HND_RESULT_T addEndpoint( HNDEndpoint newEP );
 
         void start();
