@@ -63,9 +63,21 @@ class HNDEndpoint
         std::string getOpenAPIJson();
 };
 
+class HNDEventNotifyInf
+{
+    private:
+
+    public:
+        // Settings from the device configuration file have changed.
+        virtual void hndnConfigChange( HNodeDevice *parent ) = 0;
+};
+
 class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
 {
     private:
+        std::mutex   m_configMutex;
+        bool         m_configChange;
+
         std::string  m_devType;
         std::string  m_devInstance;
         std::string  m_version;
@@ -76,12 +88,15 @@ class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
 
         std::string  m_name;
 
-        std::string  m_ownerState;
+        bool         m_owned;
+        bool         m_available;
         HNodeID      m_ownerHNodeID;
 
         std::map< std::string, HNDEndpoint > m_endpointMap;
 
         HNAvahi      m_avObj;
+
+        HNDEventNotifyInf *m_notifySink;
 
         HNHttpServer m_rest;
 
@@ -100,10 +115,20 @@ class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
         HNodeDevice( std::string deviceType, std::string devInstance );
        ~HNodeDevice();
 
+        void clearNotifySink();
+        void setNotifySink( HNDEventNotifyInf *sinkPtr );
+
+        void startConfigAccess();
+        void completeConfigAccess();
+
         void setDeviceType( std::string type );
         void setInstance( std::string instance );
         void setPort( uint16_t port );
+
         void setName( std::string value );
+
+        void clearOwner();
+        void setOwner( std::string hnodeID );
 
         std::string getInstance();
         std::string getDeviceType();
@@ -116,8 +141,11 @@ class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
 
         uint16_t getPort();
 
-        std::string getOwnerState();
+        bool isOwned();
+        bool isAvailable();
+
         std::string getOwnerHNodeIDStr();
+        std::string getOwnerCRC32IDStr();
 
         HND_RESULT_T initConfigSections( HNodeConfig &cfg );
         HND_RESULT_T updateConfigSections( HNodeConfig &cfg );

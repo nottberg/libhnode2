@@ -81,13 +81,17 @@ HNDEndpoint::getOpenAPIJson()
 HNodeDevice::HNodeDevice()
 : m_health( &m_stringStore )
 {
+    m_configChange = false;
+    m_notifySink = NULL;
+
     m_devType     = "hnode2-default-device";
     m_devInstance = "default";
     m_version     = "2.0.0";
 
     m_port        = 8080;
 
-    m_ownerState  = "available";
+    m_owned       = false;
+    m_available   = true;
 
     HNDEndpoint hndEP;
 
@@ -100,13 +104,17 @@ HNodeDevice::HNodeDevice()
 HNodeDevice::HNodeDevice( std::string deviceType, std::string instance )
 : m_health( &m_stringStore )
 {
+    m_configChange = false;
+    m_notifySink = NULL;
+
     m_devType     = deviceType;
     m_devInstance = instance;
     m_version     = "2.0.0";
 
     m_port        = 8080;
 
-    m_ownerState  = "available";
+    m_owned       = false;
+    m_available   = true;
 
     HNDEndpoint hndEP;
 
@@ -119,6 +127,37 @@ HNodeDevice::HNodeDevice( std::string deviceType, std::string instance )
 HNodeDevice::~HNodeDevice()
 {
 
+}
+
+void
+HNodeDevice::clearNotifySink()
+{
+    m_notifySink = NULL;
+}
+
+void
+HNodeDevice::setNotifySink( HNDEventNotifyInf *sinkPtr )
+{
+    m_notifySink = sinkPtr;
+}
+
+void
+HNodeDevice::startConfigAccess()
+{
+    m_configMutex.lock();
+    m_configChange = false;
+}
+
+void
+HNodeDevice::completeConfigAccess()
+{
+    if( (m_notifySink != NULL) && (m_configChange == true) )
+    {
+        m_notifySink->hndnConfigChange( this );
+        m_configChange = false;
+    }
+
+    m_configMutex.unlock();
 }
 
 void
@@ -137,12 +176,28 @@ void
 HNodeDevice::setName( std::string value )
 {
     m_name = value;
+    m_configChange = true;
 }
 
 void 
 HNodeDevice::setPort( uint16_t port )
 {
     m_port = port;
+}
+
+void 
+HNodeDevice::clearOwner()
+{
+    m_owned = false;
+    m_ownerHNodeID.clear();
+    m_configChange = true;
+}
+
+void
+HNodeDevice::setOwner( std::string hnodeID )
+{
+    m_ownerHNodeID.setFromStr( hnodeID );
+    m_configChange = true;
 }
 
 std::string 
@@ -189,10 +244,16 @@ HNodeDevice::getPort()
     return m_port;
 }
 
-std::string 
-HNodeDevice::getOwnerState()
+bool
+HNodeDevice::isOwned()
 {
-    return m_ownerState;
+    return m_owned;
+}
+
+bool
+HNodeDevice::isAvailable()
+{
+    return m_available;
 }
 
 std::string 
@@ -201,6 +262,12 @@ HNodeDevice::getOwnerHNodeIDStr()
     std::string rstStr;
     m_ownerHNodeID.getStr( rstStr );
     return rstStr;
+}
+
+std::string 
+HNodeDevice::getOwnerCRC32IDStr()
+{
+    return m_ownerHNodeID.getCRC32AsHexStr();
 }
 
 std::string
@@ -218,6 +285,8 @@ HNodeDevice::initConfigSections( HNodeConfig &cfg )
 {
     std::string rstStr;
     HNCSection *secPtr;
+
+    std::lock_guard<std::mutex> lock( m_configMutex );
 
     // Get a pointer to the device section
     cfg.updateSection( "device", &secPtr );
@@ -240,6 +309,8 @@ HNodeDevice::updateConfigSections( HNodeConfig &cfg )
     std::string rstStr;
     HNCSection *secPtr;
 
+    std::lock_guard<std::mutex> lock( m_configMutex );
+
     // Get a pointer to the device section
     cfg.updateSection( "device", &secPtr );
 
@@ -250,6 +321,13 @@ HNodeDevice::updateConfigSections( HNodeConfig &cfg )
     // Update the name
     secPtr->updateValue( "name", getName() );
 
+    // If we are claimed then add owner info
+    if( m_owned == true )
+    {
+        m_ownerHNodeID.getStr( rstStr );
+        secPtr->updateValue( "owner_hnodeID", rstStr );
+    }
+
     return HND_RESULT_SUCCESS;
 }
 
@@ -258,6 +336,8 @@ HNodeDevice::readConfigSections( HNodeConfig &cfg )
 {
     HNCSection  *secPtr;
     std::string rstStr;
+
+    std::lock_guard<std::mutex> lock( m_configMutex );
 
     // Aquire a pointer to the "device" section
     cfg.updateSection( "device", &secPtr );
@@ -278,99 +358,18 @@ HNodeDevice::readConfigSections( HNodeConfig &cfg )
 
     setName( rstStr );
   
-    return HND_RESULT_SUCCESS;
-}
-
-#if 0
-bool 
-HNodeDevice::configExists()
-{
-    HNodeConfigFile cfgFile;
-
-    cfgFile.setRootPath( HND_CFGFILE_ROOT_DEFAULT );
-
-    return cfgFile.configExists( m_devType, m_devInstance );
-}
-
-HND_RESULT_T
-HNodeDevice::loadConfig()
-{
-    std::string     rstStr;
-    HNodeConfigFile cfgFile;
-    HNodeConfig     cfg;
-
-    std::cout << "Loading config..." << std::endl;
-
-    cfgFile.setRootPath( HND_CFGFILE_ROOT_DEFAULT );
-
-    if( cfgFile.loadConfig( m_devType, m_devInstance, cfg ) != HNC_RESULT_SUCCESS )
-    {
-        std::cout << "ERROR: Could not load saved configuration." << std::endl;
-        return HND_RESULT_FAILURE;
-    }
-
-    HNCSection *secPtr;
-    cfg.updateSection( "device", &secPtr );
-
-    // Read out the HNodeID
-    if( secPtr->getValueByName( "hnodeID", rstStr ) != HNC_RESULT_SUCCESS )
-    {
-        return HND_RESULT_FAILURE;
-    }
-
-    m_hnodeID.setFromStr( rstStr );
-
     // Read the name field
-    if( secPtr->getValueByName( "name", rstStr ) != HNC_RESULT_SUCCESS )
+    if( secPtr->getValueByName( "owner_hnodeID", rstStr ) == HNC_RESULT_SUCCESS )
     {
-        return HND_RESULT_FAILURE;
+        setOwner( rstStr );
     }
-
-    setName( rstStr );
-  
-    return HND_RESULT_SUCCESS;
-}
-
-HND_RESULT_T
-HNodeDevice::saveConfig()
-{
-    std::string rstStr;
-    HNodeConfigFile cfgFile;
-    HNodeConfig     cfg;
-
-    HNCSection *secPtr;
-    cfg.updateSection( "device", &secPtr );
- 
-    m_hnodeID.getStr( rstStr );
-    secPtr->updateValue( "hnodeID", rstStr );
-
-    secPtr->updateValue( "name", getName() );
-
-    //cfg.updateSection( "owner", &secPtr );
-    //secPtr->updateValue( "test2", "value4" );
-             
-    cfgFile.setRootPath( HND_CFGFILE_ROOT_DEFAULT );
-
-    std::cout << "Saving config..." << std::endl;
-    if( cfgFile.saveConfig( m_devType, m_devInstance, cfg ) != HNC_RESULT_SUCCESS )
+    else
     {
-        std::cout << "ERROR: Could not save initial configuration." << std::endl;
-        return HND_RESULT_FAILURE;
+        clearOwner();
     }
 
     return HND_RESULT_SUCCESS;
 }
-
-void
-HNodeDevice::initToDefaults()
-{
-    // Create a new uuid
-    m_hnodeID.create();
-
-    // Set a default name
-    setName( "Name" );
-}
-#endif
 
 HND_RESULT_T
 HNodeDevice::registerFormatString( std::string formatStr, uint &code )
@@ -491,6 +490,11 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
             return;
         }
     }
+    else if( "putDeviceConfig" == opID )
+    {
+        // FIXME Send back not implemented
+        opData->responseSetStatusAndReason( HNR_HTTP_NOT_IMPLEMENTED );
+    }
     else if( "getDeviceOwner" == opID )
     {
         // Create a json root object
@@ -499,8 +503,14 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
         opData->responseSetChunkedTransferEncoding(true);
         opData->responseSetContentType("application/json");
 
-        jsRoot.set( "state", getOwnerState() );
-        jsRoot.set( "hnodeID", getOwnerHNodeIDStr() );
+        jsRoot.set( "isAvailable", m_available );
+        jsRoot.set( "isOwned", m_owned );
+
+        if( m_owned == true )
+        {
+          jsRoot.set( "owner_hnodeID", getOwnerHNodeIDStr() );
+          jsRoot.set( "owner_crc32ID", getOwnerHNodeIDStr() );
+        }
 
         // Render the response
         std::ostream& ostr = opData->responseSend();
@@ -514,6 +524,16 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
             opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
             return;
         }
+    }
+    else if( "putDeviceOwner" == opID )
+    {
+        // FIXME Send back not implemented
+        opData->responseSetStatusAndReason( HNR_HTTP_NOT_IMPLEMENTED );
+    }
+    else if( "deleteDeviceOwner" == opID )
+    {
+        // FIXME Send back not implemented
+        opData->responseSetStatusAndReason( HNR_HTTP_NOT_IMPLEMENTED );
     }
     else if( "getDeviceHealth" == opID )
     {
@@ -592,6 +612,25 @@ const std::string g_HNode2DeviceRest = R"(
             "description": "Invalid status value"
           }
         }
+      },
+      "put": {
+        "summary": "Update user configurable device settings, i.e. name",
+        "operationId": "putDeviceConfig",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
       }
     },
 
@@ -614,7 +653,45 @@ const std::string g_HNode2DeviceRest = R"(
             "description": "Invalid status value"
           }
         }
-      }
+      },
+      "put": {
+        "summary": "Claim/Update ownership of device.",
+        "operationId": "putDeviceOwner",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Release ownership of device.",
+        "operationId": "deleteDeviceOwner",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      }      
     },
 
     "/hnode2/device/health": {
