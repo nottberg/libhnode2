@@ -27,6 +27,28 @@ class HNEPLoopCallbacks
         virtual void fdError( int sfd ) = 0; 
 };
 
+class HNEPTrigger
+{
+    public:
+        HNEPTrigger();
+       ~HNEPTrigger();
+
+        HNEP_RESULT_T setup();
+        void clear();
+
+        uint getFD();
+
+        void trigger();
+
+        bool isMatch( uint sfd );
+
+        void reset();
+
+    private:
+        uint  m_fd;
+
+};
+
 class HNEPLoop
 {
     public:
@@ -34,9 +56,12 @@ class HNEPLoop
        ~HNEPLoop();
 
         HNEP_RESULT_T setup( HNEPLoopCallbacks *parent );
+    
+        HNEP_RESULT_T run();
         void stop();
 
-        HNEP_RESULT_T run();
+        HNEP_RESULT_T setupTriggerFD( HNEPTrigger &trigger );
+        void removeTriggerFD( HNEPTrigger &trigger );
 
         HNEP_RESULT_T addFDToEPoll( int sfd );
         HNEP_RESULT_T removeFDFromEPoll( int sfd );

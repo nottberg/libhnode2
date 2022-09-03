@@ -196,6 +196,7 @@ HNodeDevice::clearOwner()
 void
 HNodeDevice::setOwner( std::string hnodeID )
 {
+    m_owned = true;
     m_ownerHNodeID.setFromStr( hnodeID );
     m_configChange = true;
 }
@@ -492,8 +493,36 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
     }
     else if( "putDeviceConfig" == opID )
     {
-        // FIXME Send back not implemented
-        opData->responseSetStatusAndReason( HNR_HTTP_NOT_IMPLEMENTED );
+        std::istream& bodyStream = opData->requestBody();
+
+        // Prepare for object update
+        startConfigAccess();
+
+        // Parse the json body of the request
+        try
+        {
+            // Attempt to parse the json
+            pjs::Parser parser;
+            pdy::Var varRoot = parser.parse( bodyStream );
+
+            // Get a pointer to the root object
+            pjs::Object::Ptr jsRoot = varRoot.extract< pjs::Object::Ptr >();
+
+            if( jsRoot->has( "name" ) )
+            {
+                setName( jsRoot->getValue<std::string>( "name" ) );
+            }
+        }
+        catch( Poco::Exception ex )
+        {
+            completeConfigAccess();
+            std::cout << "putDeviceConfig exception: " << ex.displayText() << std::endl;
+            opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
+            return;
+        }
+
+        // Finish with update
+        completeConfigAccess();
     }
     else if( "getDeviceOwner" == opID )
     {
@@ -509,7 +538,7 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
         if( m_owned == true )
         {
           jsRoot.set( "owner_hnodeID", getOwnerHNodeIDStr() );
-          jsRoot.set( "owner_crc32ID", getOwnerHNodeIDStr() );
+          jsRoot.set( "owner_crc32ID", getOwnerCRC32IDStr() );
         }
 
         // Render the response
@@ -527,13 +556,43 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
     }
     else if( "putDeviceOwner" == opID )
     {
-        // FIXME Send back not implemented
-        opData->responseSetStatusAndReason( HNR_HTTP_NOT_IMPLEMENTED );
+        std::istream& bodyStream = opData->requestBody();
+
+        // Prepare for object update
+        startConfigAccess();
+
+        // Parse the json body of the request
+        try
+        {
+            // Attempt to parse the json
+            pjs::Parser parser;
+            pdy::Var varRoot = parser.parse( bodyStream );
+
+            // Get a pointer to the root object
+            pjs::Object::Ptr jsRoot = varRoot.extract< pjs::Object::Ptr >();
+
+            if( jsRoot->has( "owner_hnodeID" ) )
+            {
+                setOwner( jsRoot->getValue<std::string>( "owner_hnodeID" ) );
+            }
+        }
+        catch( Poco::Exception ex )
+        {
+            completeConfigAccess();
+            std::cout << "putDeviceOwner exception: " << ex.displayText() << std::endl;
+            opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
+            return;
+        }
+
+        // Finish with update
+        completeConfigAccess();
     }
     else if( "deleteDeviceOwner" == opID )
     {
-        // FIXME Send back not implemented
-        opData->responseSetStatusAndReason( HNR_HTTP_NOT_IMPLEMENTED );
+        // Clear the current owner
+        startConfigAccess();
+        clearOwner();
+        completeConfigAccess();
     }
     else if( "getDeviceHealth" == opID )
     {
@@ -556,12 +615,18 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
     {
         // FIXME Send back not implemented
         opData->responseSetStatusAndReason( HNR_HTTP_NOT_IMPLEMENTED );
+        return;
     }
     else
     {
         // Send back not implemented
         opData->responseSetStatusAndReason( HNR_HTTP_NOT_IMPLEMENTED );
+        return;
     }
+
+    // Send back ok
+    opData->responseSetStatusAndReason( HNR_HTTP_OK );
+    opData->responseSend();
 }
 
 void 

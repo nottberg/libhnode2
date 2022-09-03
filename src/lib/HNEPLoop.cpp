@@ -1,6 +1,82 @@
+#include <iostream>
+
+#include <sys/eventfd.h>
+
 #include "HNEPLoop.h"
 
 #define MAXEVENTS 8
+
+HNEPTrigger::HNEPTrigger()
+{
+    m_fd = 0;
+}
+
+HNEPTrigger::~HNEPTrigger()
+{
+    if( m_fd != 0 )
+        close( m_fd );
+    m_fd = 0;
+}
+
+HNEP_RESULT_T 
+HNEPTrigger::setup()
+{
+    m_fd = eventfd( 0, 0 );
+    if( m_fd == -1 )
+        return HNEP_RESULT_FAILURE;
+
+    std::cout << "HNEPTrigger - new trigger fd: " << m_fd << std::endl;
+
+    return HNEP_RESULT_SUCCESS;
+}
+
+void
+HNEPTrigger::clear()
+{
+    if( m_fd != 0 )
+        close( m_fd );
+    m_fd = 0;
+}
+
+uint 
+HNEPTrigger::getFD()
+{
+    return m_fd;
+}
+
+void 
+HNEPTrigger::trigger()
+{
+    uint64_t value = 1;
+    ssize_t result;
+
+    if( m_fd == 0 )
+        return;
+
+    result = write( m_fd, &value, sizeof(value) );
+
+    std::cout << "HNEPTrigger::trigger - fd: " << m_fd << "  result: " << result << std::endl;
+}
+
+bool 
+HNEPTrigger::isMatch( uint sfd )
+{
+    return (m_fd == sfd);
+}
+
+void 
+HNEPTrigger::reset()
+{
+    uint64_t value = 1;
+    ssize_t result;
+
+    if( m_fd == 0 )
+        return;
+
+    result = read( m_fd, &value, sizeof(value) );
+    
+    std::cout << "HNEPTrigger::reset - fd: " << m_fd << "  result: " << result << std::endl;
+}
 
 HNEPLoop::HNEPLoop()
 {
@@ -117,6 +193,22 @@ HNEPLoop::run()
 
     // Successful exit
     return HNEP_RESULT_SUCCESS;
+}
+
+HNEP_RESULT_T
+HNEPLoop::setupTriggerFD( HNEPTrigger &trigger )
+{
+    if( trigger.setup() != HNEP_RESULT_SUCCESS )
+        return HNEP_RESULT_FAILURE;
+    
+    return addFDToEPoll( trigger.getFD() );
+}
+
+void
+HNEPLoop::removeTriggerFD( HNEPTrigger &trigger )
+{
+    removeFDFromEPoll( trigger.getFD() );
+    trigger.clear();
 }
 
 HNEP_RESULT_T
