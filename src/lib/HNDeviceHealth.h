@@ -137,6 +137,10 @@ class HNDeviceHealth
         HNDH_RESULT_T getRestJSON( std::string &jsonStr );
         HNDH_RESULT_T getRestJSON( std::ostream &oStream );
 
+        void clearService();
+        void setServiceRootURIFromStr( std::string value );
+        std::string getServiceRootURIAsStr();
+
     private:
         HNDH_RESULT_T allocUniqueID( std::string &compID );
 
@@ -172,6 +176,9 @@ class HNDeviceHealth
 
         // Access to registered format strings for status and note messages.
         HNFormatStringStore *m_stringStore;
+
+        // Keep track of the service url for push notifications of health changes.
+        std::string m_serviceRootURI;
 };
 
 #endif // __HN_DEVICE_HEALTH_H__

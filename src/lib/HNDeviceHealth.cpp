@@ -708,3 +708,22 @@ HNDeviceHealth::getRestJSON( std::ostream &oStream )
 
     return HNDH_RESULT_SUCCESS;
 }
+
+void
+HNDeviceHealth::clearService()
+{
+    m_serviceRootURI.clear();
+}
+
+void
+HNDeviceHealth::setServiceRootURIFromStr( std::string value )
+{
+    std::cout << "HNDeviceHealth::setServiceRootURIFromStr - uri: " << value << std::endl;
+    m_serviceRootURI = value;
+}
+
+std::string
+HNDeviceHealth::getServiceRootURIAsStr()
+{
+    return m_serviceRootURI;
+}

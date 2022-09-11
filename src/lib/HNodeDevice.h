@@ -147,6 +147,12 @@ class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
         std::string getOwnerHNodeIDStr();
         std::string getOwnerCRC32IDStr();
 
+        bool hasHealthMonitoring();
+        bool hasEventing();
+        bool hasLogging();
+        bool hasDataCollection();
+        bool hasKeyValue();
+
         HND_RESULT_T initConfigSections( HNodeConfig &cfg );
         HND_RESULT_T updateConfigSections( HNodeConfig &cfg );
         HND_RESULT_T readConfigSections( HNodeConfig &cfg );
