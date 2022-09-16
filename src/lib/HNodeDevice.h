@@ -72,6 +72,45 @@ class HNDEventNotifyInf
         virtual void hndnConfigChange( HNodeDevice *parent ) = 0;
 };
 
+typedef enum HNDServiceRecordFlagsEnum
+{
+    HNDSR_FLAGS_NOTSET      = 0x00000000,  // Default
+    HNDSR_FLAGS_DEVICE_REST = 0x00000001,  // A unique portion of the HNode Device REST tree
+    HNDSR_FLAGS_MAPPED      = 0x00000002   // A mapping to a remote uri has been established
+}HNDSR_FLAGS_T;
+
+
+// Data about a provided/consumed hnode device service interface
+class HNDServiceRecord
+{
+    private:
+        HNDSR_FLAGS_T  m_flags;
+
+        std::string    m_svcType;
+        std::string    m_version;
+
+        std::string    m_uri;
+
+
+    public:
+        HNDServiceRecord();
+       ~HNDServiceRecord();
+
+        void setType( std::string value );
+        void setVersion( std::string value );
+        
+        void setURIFromStr( std::string uri );
+        
+        void setMapped( bool value );
+
+        bool isMapped();
+
+        std::string getType();
+        std::string getVersion();
+
+        std::string getURIAsStr();
+};
+
 class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
 {
     private:
@@ -100,8 +139,16 @@ class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
 
         HNHttpServer m_rest;
 
+        // Track the services that this hnode provides.
+        std::map< std::string, HNDServiceRecord > m_advertisedServices;
+
+        // Track the services that this hnode desires to consume.
+        std::map< std::string, HNDServiceRecord > m_desiredServices;
+
+        // Store string references for hnode components.
         HNFormatStringStore m_stringStore;
 
+        // Implement built-in support for hnode health monitoring.
         HNDeviceHealth m_health;
 
         std::string createAvahiName();
@@ -158,6 +205,28 @@ class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
         HND_RESULT_T readConfigSections( HNodeConfig &cfg );
 
         //void initToDefaults();
+
+        // Clear the provided services map
+        void clearProvidedServices();
+
+        // Add provided service advertisements
+        void registerProvidedService( std::string typeStr, std::string versionStr, std::string uri );
+        void registerProvidedServiceREST( std::string typeStr, std::string versionStr, std::string rootPath );
+
+        // Clear a provided service advertisment.
+        void clearProvidedService( std::string typeStr );
+
+        // Clear the mapped services map
+        void clearDesiredServices();
+
+        // Add a desired service mapping to the mapped services map
+        void addDesiredService( std::string typeStr );
+
+        // Clear a single mapped service
+        void clearDesiredService( std::string typeStr );
+
+        // Get information about a mapped service.
+        bool isServiceMapped( std::string typeStr );
 
         // Register format strings for use by health monitoring and logging
         HND_RESULT_T registerFormatString( std::string formatStr, uint &code );

@@ -78,6 +78,67 @@ HNDEndpoint::getOpenAPIJson()
     return m_OpenAPI;
 }
 
+HNDServiceRecord::HNDServiceRecord()
+{
+    m_flags = HNDSR_FLAGS_NOTSET;
+}
+
+HNDServiceRecord::~HNDServiceRecord()
+{
+
+}
+
+void
+HNDServiceRecord::setType( std::string value )
+{
+    m_svcType = value;
+}
+
+void
+HNDServiceRecord::setVersion( std::string value )
+{
+    m_version = value;
+}
+        
+void
+HNDServiceRecord::setURIFromStr( std::string uri )
+{
+    m_uri = uri;
+}
+
+void
+HNDServiceRecord::setMapped( bool value )
+{
+    if( value == true )
+      m_flags = (HNDSR_FLAGS_T) (m_flags | HNDSR_FLAGS_MAPPED);
+    else
+      m_flags = (HNDSR_FLAGS_T) (m_flags & ~HNDSR_FLAGS_MAPPED);
+}
+
+bool
+HNDServiceRecord::isMapped()
+{
+    return (m_flags & HNDSR_FLAGS_MAPPED) ? true : false;
+}
+
+std::string
+HNDServiceRecord::getVersion()
+{
+    return m_version;
+}
+
+std::string
+HNDServiceRecord::getURIAsStr()
+{
+    return m_uri;
+}
+
+std::string
+HNDServiceRecord::getType()
+{
+    return m_svcType;
+}
+
 HNodeDevice::HNodeDevice()
 : m_health( &m_stringStore )
 {
@@ -402,6 +463,81 @@ HNodeDevice::readConfigSections( HNodeConfig &cfg )
     return HND_RESULT_SUCCESS;
 }
 
+void
+HNodeDevice::clearProvidedServices()
+{
+    m_advertisedServices.clear();
+}
+
+void
+HNodeDevice::clearProvidedService( std::string typeStr )
+{
+    std::map< std::string, HNDServiceRecord >::iterator it = m_advertisedServices.find( typeStr );
+
+    if( it != m_advertisedServices.end() )
+        m_advertisedServices.erase( it );
+}
+
+void
+HNodeDevice::registerProvidedService( std::string typeStr, std::string versionStr, std::string uri )
+{
+    HNDServiceRecord srvRec;
+
+    srvRec.setType( typeStr );
+    srvRec.setVersion( versionStr );
+    srvRec.setURIFromStr( uri );
+
+    m_advertisedServices.insert( std::pair<std::string, HNDServiceRecord>( typeStr, srvRec ) );
+}
+
+void
+HNodeDevice::registerProvidedServiceREST( std::string typeStr, std::string versionStr, std::string rootPath )
+{
+    HNDServiceRecord srvRec;
+
+    srvRec.setType( typeStr );
+    srvRec.setVersion( versionStr );
+    srvRec.setURIFromStr( rootPath );
+
+    m_advertisedServices.insert( std::pair<std::string, HNDServiceRecord>( typeStr, srvRec ) );
+}
+
+void
+HNodeDevice::clearDesiredServices()
+{
+    m_desiredServices.clear();
+}
+
+void
+HNodeDevice::clearDesiredService( std::string typeStr )
+{
+    std::map< std::string, HNDServiceRecord >::iterator it = m_desiredServices.find( typeStr );
+
+    if( it != m_desiredServices.end() )
+        m_desiredServices.erase( it );
+}
+
+void
+HNodeDevice::addDesiredService( std::string typeStr )
+{
+    HNDServiceRecord srvRec;
+
+    srvRec.setType( typeStr );
+
+    m_desiredServices.insert( std::pair<std::string, HNDServiceRecord>( typeStr, srvRec ) );
+}
+
+bool
+HNodeDevice::isServiceMapped( std::string typeStr )
+{
+    std::map< std::string, HNDServiceRecord >::iterator it = m_desiredServices.find( typeStr );
+
+    if( it != m_desiredServices.end() )
+        return false;
+
+    return it->second.isMapped();
+}
+
 HND_RESULT_T
 HNodeDevice::registerFormatString( std::string formatStr, uint &code )
 {
@@ -414,7 +550,14 @@ HNodeDevice::registerFormatString( std::string formatStr, uint &code )
 HND_RESULT_T
 HNodeDevice::enableHealthMonitoring()
 {
-    m_health.setEnabled(); 
+    m_health.setEnabled();
+
+    // Indicate support for healh information requests
+    registerProvidedServiceREST( "hnsrv-health-source", "1.0.0", "/hnode2/device/health" );
+
+    // Indicate support for sending health information
+    addDesiredService( "hnsrv-health-sink" );
+
     return HND_RESULT_SUCCESS;
 }
 
@@ -647,51 +790,42 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
         clearOwner();
         completeConfigAccess();
     }
-    else if( "getDeviceHealth" == opID )
+    // GET /hnode2/device/services
+    else if( "getDeviceServices" == opID )
     {
-        HNDH_RESULT_T result;
-
-        opData->responseSetChunkedTransferEncoding(true);
-        opData->responseSetContentType("application/json");
-
-        // Render the response
-        std::ostream& ostr = opData->responseSend();
-        result = m_health.getRestJSON( ostr );
-
-        if( result != HNDH_RESULT_SUCCESS )
-        {
-            opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
-            opData->responseSend();
-            return;
-        }
-    }
-    else if( "getDeviceHealthComponent" == opID )
-    {
-        // FIXME Send back not implemented
-        opData->responseSetStatusAndReason( HNR_HTTP_NOT_IMPLEMENTED );
-        opData->responseSend();
-        return;
-    }    
-    // GET /hnode2/device/services/
-    else if( "getServiceSettings" == opID )
-    {
-        HNDH_RESULT_T result;
-
-        opData->responseSetChunkedTransferEncoding(true);
-        opData->responseSetContentType("application/json");
-
-        // Build the response info
+        // Create a json root object
         pjs::Object jsRoot;
+        pjs::Array  jsProvidedServices;
+        pjs::Array  jsDesiredServices;
 
-        if( hasHealthMonitoring() )
-        {
-            pjs::Object jsSrvObj;
+        opData->responseSetChunkedTransferEncoding(true);
+        opData->responseSetContentType("application/json");
 
-            jsSrvObj.set( "rootURI", m_health.getServiceRootURIAsStr() );
-            jsSrvObj.set( "hasAuthKey", false );
+        for( std::map<std::string, HNDServiceRecord>::iterator it = m_advertisedServices.begin(); it != m_advertisedServices.end(); it++ )
+        {        
+            pjs::Object jsService;
 
-            jsRoot.set("health", jsSrvObj );
+            jsService.set( "type", it->second.getType() );
+            jsService.set( "version", it->second.getVersion() );
+            jsService.set( "uri", it->second.getURIAsStr() );
+
+            jsProvidedServices.add( jsService );
         }
+
+        jsRoot.set( "providedServices", jsProvidedServices );
+
+        for( std::map<std::string, HNDServiceRecord>::iterator it = m_desiredServices.begin(); it != m_desiredServices.end(); it++ )
+        {        
+            pjs::Object jsService;
+
+            jsService.set( "type", it->second.getType() );
+            jsService.set( "version", it->second.getVersion() );
+            jsService.set( "uri", it->second.getURIAsStr() );
+
+            jsDesiredServices.add( jsService );
+        }
+
+        jsRoot.set( "desiredServices", jsDesiredServices );
 
         // Render the response
         std::ostream& ostr = opData->responseSend();
@@ -707,8 +841,122 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
             return;
         }
     }
-    // PUT /hnode2/device/services/{serviceName}
-    else if( "putServiceSettings" == opID )
+    // GET /hnode2/device/services/provided
+    else if( "getServicesProvidedList" == opID )
+    {
+        // Create a json root object
+        pjs::Array  jsProvidedServices;
+
+        opData->responseSetChunkedTransferEncoding(true);
+        opData->responseSetContentType("application/json");
+
+        for( std::map<std::string, HNDServiceRecord>::iterator it = m_advertisedServices.begin(); it != m_advertisedServices.end(); it++ )
+        {        
+            pjs::Object jsService;
+
+            jsService.set( "type", it->second.getType() );
+            jsService.set( "version", it->second.getVersion() );
+            jsService.set( "uri", it->second.getURIAsStr() );
+
+            jsProvidedServices.add( jsService );
+        }
+
+        // Render the response
+        std::ostream& ostr = opData->responseSend();
+        try
+        {
+            // Write out the generated json
+            pjs::Stringifier::stringify( jsProvidedServices, ostr, 1 );
+        }
+        catch( ... )
+        {
+            opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
+            opData->responseSend();
+            return;
+        }
+    }
+    // GET /hnode2/device/services/provided/{serviceType}
+    else if( "getServicesProvided" == opID )
+    {
+        HNDH_RESULT_T result;
+        std::string serviceType;
+
+        if( opData->getParam( "serviceType", serviceType ) == true )
+        {
+            opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
+            opData->responseSend();
+            return; 
+        }
+
+        // Create a json root object
+        pjs::Object jsService;
+
+        std::map<std::string, HNDServiceRecord>::iterator it = m_advertisedServices.find( serviceType );
+
+        if( it == m_advertisedServices.end() )
+        {
+            opData->responseSetStatusAndReason( HNR_HTTP_NOT_FOUND );
+            opData->responseSend();
+            return; 
+        }
+
+        opData->responseSetChunkedTransferEncoding(true);
+        opData->responseSetContentType("application/json");
+
+        jsService.set( "type", it->second.getType() );
+        jsService.set( "version", it->second.getVersion() );
+        jsService.set( "uri", it->second.getURIAsStr() );
+
+        // Render the response
+        std::ostream& ostr = opData->responseSend();
+        try
+        {
+            // Write out the generated json
+            pjs::Stringifier::stringify( jsService, ostr, 1 );
+        }
+        catch( ... )
+        {
+            opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
+            opData->responseSend();
+            return;
+        }
+    }
+    // GET /hnode2/device/services/mappings
+    else if( "getServiceMappings" == opID )
+    {
+        // Create a json root object
+        pjs::Array  jsDesiredServices;
+
+        opData->responseSetChunkedTransferEncoding(true);
+        opData->responseSetContentType("application/json");
+
+        for( std::map<std::string, HNDServiceRecord>::iterator it = m_desiredServices.begin(); it != m_desiredServices.end(); it++ )
+        {        
+            pjs::Object jsService;
+
+            jsService.set( "type", it->second.getType() );
+            jsService.set( "version", it->second.getVersion() );
+            jsService.set( "uri", it->second.getURIAsStr() );
+
+            jsDesiredServices.add( jsService );
+        }
+
+        // Render the response
+        std::ostream& ostr = opData->responseSend();
+        try
+        {
+            // Write out the generated json
+            pjs::Stringifier::stringify( jsDesiredServices, ostr, 1 );
+        }
+        catch( ... )
+        {
+            opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
+            opData->responseSend();
+            return;
+        }
+    }
+    // PUT /hnode2/device/services/mappings
+    else if( "putServiceMappings" == opID )
     {
         HNDH_RESULT_T result;
 
@@ -745,46 +993,43 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
             return; 
         }
     }  
-    // GET /hnode2/device/services/{serviceName}    
-    else if( "getSingleServiceInfo" == opID )
+    // GET /hnode2/device/services/mappings/{serviceType}
+    else if( "getServiceMapping" == opID )
     {
         HNDH_RESULT_T result;
-        std::string serviceName;
+        std::string serviceType;
 
-        if( opData->getParam( "serviceName", serviceName ) == true )
+        if( opData->getParam( "serviceType", serviceType ) == true )
         {
             opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
             opData->responseSend();
             return; 
         }
 
-        opData->responseSetChunkedTransferEncoding(true);
-        opData->responseSetContentType("application/json");
+        std::map< std::string, HNDServiceRecord >::iterator it = m_desiredServices.find( serviceType );
 
-        pjs::Object jsRoot;
-        // Build the response info
-        if( serviceName == "health" && hasHealthMonitoring() )
-        {
-            jsRoot.set( "rootURI", m_health.getServiceRootURIAsStr() );
-            jsRoot.set( "hasAuthKey", false );
-        }
-        else if( serviceName == "event" && hasEventing() )
-        {
-
-        }
-        else
+        if( it == m_desiredServices.end() )
         {
             opData->responseSetStatusAndReason( HNR_HTTP_NOT_FOUND );
             opData->responseSend();
             return;
         }
 
+        opData->responseSetChunkedTransferEncoding(true);
+        opData->responseSetContentType("application/json");
+
+        pjs::Object jsService;
+
+        jsService.set( "type", it->second.getType() );
+        jsService.set( "version", it->second.getVersion() );
+        jsService.set( "uri", it->second.getURIAsStr() );
+
         // Render the response
         std::ostream& ostr = opData->responseSend();
         try
         {
             // Write out the generated json
-            pjs::Stringifier::stringify( jsRoot, ostr, 1 );
+            pjs::Stringifier::stringify( jsService, ostr, 1 );
         }
         catch( ... )
         {
@@ -793,13 +1038,13 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
             return;
         }
     }
-    // PUT /hnode2/device/services/{serviceName}
-    else if( "putSingleServiceSettings" == opID )
+    // PUT /hnode2/device/service-mappings/{serviceType}
+    else if( "putServiceMapping" == opID )
     {
         HNDH_RESULT_T result;
-        std::string serviceName;
+        std::string serviceType;
 
-        if( opData->getParam( "serviceName", serviceName ) == true )
+        if( opData->getParam( "serviceType", serviceType ) == true )
         {
             opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
             opData->responseSend();
@@ -817,7 +1062,7 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
             // Get a pointer to the root object
             pjs::Object::Ptr jsRoot = varRoot.extract< pjs::Object::Ptr >();
 
-            if( ("health" == serviceName) && hasHealthMonitoring() )
+            if( ("health" == serviceType) && hasHealthMonitoring() )
             {
                 if( jsRoot->has( "rootURI" ) )
                 {
@@ -836,7 +1081,32 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
             opData->responseSend();
             return; 
         }
-    }     
+    }
+    else if( "getDeviceHealth" == opID )
+    {
+        HNDH_RESULT_T result;
+
+        opData->responseSetChunkedTransferEncoding(true);
+        opData->responseSetContentType("application/json");
+
+        // Render the response
+        std::ostream& ostr = opData->responseSend();
+        result = m_health.getRestJSON( ostr );
+
+        if( result != HNDH_RESULT_SUCCESS )
+        {
+            opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
+            opData->responseSend();
+            return;
+        }
+    }
+    else if( "getDeviceHealthComponent" == opID )
+    {
+        // FIXME Send back not implemented
+        opData->responseSetStatusAndReason( HNR_HTTP_NOT_IMPLEMENTED );
+        opData->responseSend();
+        return;
+    }    
     else
     {
         // Send back not implemented
@@ -920,28 +1190,6 @@ const std::string g_HNode2DeviceRest = R"(
       }
     },
 
-    "/hnode2/device/endpoint/{epIndx}": {
-      "get": {
-        "summary": "Get information for a specific endpoint.",
-        "operationId": "getSpecificEndpoint",
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid status value"
-          }
-        }
-      }
-    },
-
     "/hnode2/device/owner": {
       "get": {
         "summary": "Get information about the owner of this device.",
@@ -984,6 +1232,154 @@ const std::string g_HNode2DeviceRest = R"(
       "delete": {
         "summary": "Release ownership of device.",
         "operationId": "deleteDeviceOwner",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      }      
+    },
+    
+    "/hnode2/device/services": {
+      "get": {
+        "summary": "Get info about services provided and services desired by this node",
+        "operationId": "getDeviceServices",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      }
+    },
+
+    "/hnode2/device/services/provided": {
+      "get": {
+        "summary": "Get information about all provided service-endpoints",
+        "operationId": "getServicesProvidedList",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      }
+    },
+
+    "/hnode2/device/services/provided/{serviceType}": {
+      "get": {
+        "summary": "Get information for a specific service endpoint.",
+        "operationId": "getServicesProvided",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      }
+    },
+
+    "/hnode2/device/services/mappings": {
+      "get": {
+        "summary": "Get info about current mappings for desired services.",
+        "operationId": "getServiceMappings",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      },
+      "put": {
+        "summary": "Bulk modify desired services mappings.",
+        "operationId": "putServiceMappings",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      }
+    },
+
+    "/hnode2/device/services/mappings/{serviceType}": {
+      "get": {
+        "summary": "Get info about a single service's settings.",
+        "operationId": "getServiceMapping",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      },
+      "put": {
+        "summary": "Modify a single service mapping.",
+        "operationId": "putServiceMapping",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1044,88 +1440,6 @@ const std::string g_HNode2DeviceRest = R"(
           }
         }
       }
-    },
-
-    "/hnode2/device/services": {
-      "get": {
-        "summary": "Get info device settings for consumed cluster services.",
-        "operationId": "getServiceSettings",
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid status value"
-          }
-        }
-      },
-      "put": {
-        "summary": "Bulk modify service settings.",
-        "operationId": "putServiceSettings",
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid status value"
-          }
-        }
-      }
-    },
-
-    "/hnode2/device/services/{serviceName}": {
-      "get": {
-        "summary": "Get info about a single service's settings.",
-        "operationId": "getSingleServiceInfo",
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid status value"
-          }
-        }
-      },
-      "put": {
-        "summary": "Modify a single services settings.",
-        "operationId": "putSingleServiceSettings",
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid status value"
-          }
-        }
-      }      
     }
   }
 }
