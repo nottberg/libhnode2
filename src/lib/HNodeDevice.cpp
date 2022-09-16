@@ -968,22 +968,45 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
             pjs::Parser parser;
             pdy::Var varRoot = parser.parse( bodyStream );
 
-            // Get a pointer to the root object
-            pjs::Object::Ptr jsRoot = varRoot.extract< pjs::Object::Ptr >();
-
-            if( jsRoot->has( "health" ) && hasHealthMonitoring() )
+            if( varRoot.isArray() == false )
             {
-                pjs::Object::Ptr jsSvcObj = jsRoot->getObject( "health" );
-                
-                if( jsSvcObj->has( "rootURI" ) )
+                opData->responseSetStatusAndReason( HNR_HTTP_BAD_REQUEST );
+                opData->responseSend();
+                return;
+            }
+
+            // Get a pointer to the root object
+            pjs::Array::Ptr jsRoot = varRoot.extract< pjs::Array::Ptr >();
+
+            // Go through each object in the array
+            for( uint i = 0; i < jsRoot->size(); i++ )
+            {
+                // Make sure array member is an object
+                if( jsRoot->isObject( i ) )
+                    continue;
+
+                pjs::Object::Ptr jsService = jsRoot->getObject( i );
+
+                if( jsService->has( "type" ) == false )
+                    continue;
+
+                std::string srvType = jsService->getValue<std::string>( "type" );
+
+                std::map< std::string, HNDServiceRecord >::iterator it = m_desiredServices.find( srvType );
+
+                if( it == m_desiredServices.end() )
+                    continue;
+
+                if( jsService->has( "uri" ) )
                 {
-                    m_health.setServiceRootURIFromStr( jsSvcObj->getValue< std::string >( "rootURI" ) );
-                }
-                else
-                {
-                    m_health.clearService();
+                    std::cout << "Mapping service: " << srvType << "  to: " << jsService->getValue<std::string>( "uri" );
+                    it->second.setURIFromStr( jsService->getValue<std::string>( "uri" ) );
+                    it->second.setMapped( true );
                 }
             }
+
+            // m_health.setServiceRootURIFromStr( jsSvcObj->getValue< std::string >( "rootURI" ) );
+
         }
         catch( Poco::Exception ex )
         {
