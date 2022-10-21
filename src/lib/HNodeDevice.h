@@ -9,6 +9,7 @@
 #include "HNodeConfig.h"
 #include "HNFormatStrs.h"
 #include "HNDeviceHealth.h"
+#include "HNHostNetwork.h"
 
 #define HNODE_DEVICE_AVAHI_TYPE  "_hnode2-rest-http._tcp"
 #define HND_CFGFILE_ROOT_DEFAULT  "/var/cache/hnode2/"
@@ -72,43 +73,58 @@ class HNDEventNotifyInf
         virtual void hndnConfigChange( HNodeDevice *parent ) = 0;
 };
 
-typedef enum HNDServiceRecordFlagsEnum
+// Enumeration of the ways services can be specified.
+typedef enum 
 {
-    HNDSR_FLAGS_NOTSET      = 0x00000000,  // Default
-    HNDSR_FLAGS_DEVICE_REST = 0x00000001,  // A unique portion of the HNode Device REST tree
-    HNDSR_FLAGS_MAPPED      = 0x00000002   // A mapping to a remote uri has been established
-}HNDSR_FLAGS_T;
-
+    HNDS_TYPE_NOTSET,     // Default value 
+    HNDS_TYPE_DEVICEREST, // An extension of the hnode2 root REST server namespace
+    HNDS_TYPE_CUSTOM      // A wholly specified, seperate protocol
+}HNDS_TYPE_T;
 
 // Data about a provided/consumed hnode device service interface
 class HNDServiceRecord
 {
     private:
-        HNDSR_FLAGS_T  m_flags;
+        HNDS_TYPE_T    m_specType;
 
-        std::string    m_svcType;
+        std::string    m_svcType;       
         std::string    m_version;
+        std::string    m_extPath;
+        std::string    m_customURI;
 
-        std::string    m_uri;
+        bool m_isMapped;
 
+        std::string m_providerCRC32ID;
+        std::string m_providerURI;
 
     public:
         HNDServiceRecord();
        ~HNDServiceRecord();
 
+        void setSpecType( HNDS_TYPE_T stype );
+
         void setType( std::string value );
         void setVersion( std::string value );
-        
-        void setURIFromStr( std::string uri );
-        
-        void setMapped( bool value );
+        void setExtPath( std::string value );      
+        void setCustomURIFromStr( std::string uri );
 
-        bool isMapped();
+        //void setDeviceExtension( bool value );
+        void setMapped( bool value );
+    
+        void setProviderCRC32ID( std::string crc32ID );
+        void setProviderURIFromStr( std::string uri );
+
+        HNDS_TYPE_T getSpecType();
 
         std::string getType();
         std::string getVersion();
+        std::string getExtPath();
+        std::string getCustomURIAsStr();
 
-        std::string getURIAsStr();
+        bool isMapped();
+
+        std::string getProviderCRC32ID();
+        std::string getProviderURIAsStr();
 };
 
 class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
@@ -121,7 +137,10 @@ class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
         std::string  m_devInstance;
         std::string  m_version;
 
-        uint16_t     m_port;
+        HNHostNetwork m_network;
+        std::string   m_address;
+        uint16_t      m_port;
+        std::string   m_rootPath;
 
         HNodeID      m_hnodeID;
 
@@ -170,7 +189,10 @@ class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
 
         void setDeviceType( std::string type );
         void setInstance( std::string instance );
-        void setPort( uint16_t port );
+
+        void setRestAddress( std::string address );
+        void setRestPort( uint16_t port );
+        void setRestRootPath( std::string path );
 
         void setName( std::string value );
 
@@ -186,7 +208,9 @@ class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
 
         std::string getName();
 
-        uint16_t getPort();
+        std::string getRestAddress();
+        uint16_t getRestPort();
+        std::string getRestRootPath();
 
         bool isOwned();
         bool isAvailable();
@@ -210,8 +234,8 @@ class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
         void clearProvidedServices();
 
         // Add provided service advertisements
-        void registerProvidedService( std::string typeStr, std::string versionStr, std::string uri );
-        void registerProvidedServiceREST( std::string typeStr, std::string versionStr, std::string rootPath );
+        void registerProvidedServiceCustom( std::string typeStr, std::string versionStr, std::string uri );
+        void registerProvidedServiceExtension( std::string typeStr, std::string versionStr, std::string extPath );
 
         // Clear a provided service advertisment.
         void clearProvidedService( std::string typeStr );

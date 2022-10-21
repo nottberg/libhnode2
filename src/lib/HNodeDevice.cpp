@@ -80,12 +80,19 @@ HNDEndpoint::getOpenAPIJson()
 
 HNDServiceRecord::HNDServiceRecord()
 {
-    m_flags = HNDSR_FLAGS_NOTSET;
+    m_specType = HNDS_TYPE_NOTSET;
+    m_isMapped = false;
 }
 
 HNDServiceRecord::~HNDServiceRecord()
 {
 
+}
+
+void
+HNDServiceRecord::setSpecType( HNDS_TYPE_T stype )
+{
+    m_specType = stype;
 }
 
 void
@@ -101,25 +108,48 @@ HNDServiceRecord::setVersion( std::string value )
 }
         
 void
-HNDServiceRecord::setURIFromStr( std::string uri )
+HNDServiceRecord::setCustomURIFromStr( std::string uri )
 {
-    m_uri = uri;
+    m_customURI = uri;
 }
+
+void
+HNDServiceRecord::setExtPath( std::string path )
+{
+    m_extPath = path;
+}
+
+#if 0
+void
+HNDServiceRecord::setDeviceExtension( bool value )
+{
+    m_isDeviceExtension = value;
+}
+#endif
 
 void
 HNDServiceRecord::setMapped( bool value )
 {
-    if( value == true )
-      m_flags = (HNDSR_FLAGS_T) (m_flags | HNDSR_FLAGS_MAPPED);
-    else
-      m_flags = (HNDSR_FLAGS_T) (m_flags & ~HNDSR_FLAGS_MAPPED);
+    m_isMapped = value;
 }
 
-bool
-HNDServiceRecord::isMapped()
+void
+HNDServiceRecord::setProviderCRC32ID( std::string crc32ID )
 {
-    return (m_flags & HNDSR_FLAGS_MAPPED) ? true : false;
+    m_providerCRC32ID = crc32ID;
 }
+
+void
+HNDServiceRecord::setProviderURIFromStr( std::string uri )
+{
+    m_providerURI = uri;
+}
+
+HNDS_TYPE_T
+HNDServiceRecord::getSpecType()
+{
+    return m_specType;
+}    
 
 std::string
 HNDServiceRecord::getVersion()
@@ -128,15 +158,47 @@ HNDServiceRecord::getVersion()
 }
 
 std::string
-HNDServiceRecord::getURIAsStr()
+HNDServiceRecord::getCustomURIAsStr()
 {
-    return m_uri;
+    return m_customURI;
+}
+
+std::string
+HNDServiceRecord::getExtPath()
+{
+    return m_extPath;
 }
 
 std::string
 HNDServiceRecord::getType()
 {
     return m_svcType;
+}
+
+#if 0
+bool
+HNDServiceRecord::isDeviceExtension()
+{
+    return m_isDeviceExtension;
+}
+#endif
+
+bool
+HNDServiceRecord::isMapped()
+{
+    return m_isMapped;
+}
+
+std::string
+HNDServiceRecord::getProviderCRC32ID()
+{
+    return m_providerCRC32ID;
+}
+
+std::string
+HNDServiceRecord::getProviderURIAsStr()
+{
+    return m_providerURI;
 }
 
 HNodeDevice::HNodeDevice()
@@ -150,6 +212,7 @@ HNodeDevice::HNodeDevice()
     m_version     = "2.0.0";
 
     m_port        = 8080;
+    m_rootPath    = "hnode2";
 
     m_owned       = false;
     m_available   = true;
@@ -173,6 +236,7 @@ HNodeDevice::HNodeDevice( std::string deviceType, std::string instance )
     m_version     = "2.0.0";
 
     m_port        = 8080;
+    m_rootPath    = "hnode2";
 
     m_owned       = false;
     m_available   = true;
@@ -241,9 +305,21 @@ HNodeDevice::setName( std::string value )
 }
 
 void 
-HNodeDevice::setPort( uint16_t port )
+HNodeDevice::setRestAddress( std::string addrStr )
+{
+
+}
+
+void 
+HNodeDevice::setRestPort( uint16_t port )
 {
     m_port = port;
+}
+
+void 
+HNodeDevice::setRestRootPath( std::string pathStr )
+{
+    m_rootPath = pathStr;
 }
 
 void 
@@ -300,10 +376,27 @@ HNodeDevice::getName()
     return m_name;
 }
 
+std::string
+HNodeDevice::getRestAddress()
+{
+    if( m_address.empty() == true )
+    {
+        return m_network.getDefaultIPV4AddrStr();
+    }
+
+    return m_address;
+}
+
 uint16_t
-HNodeDevice::getPort()
+HNodeDevice::getRestPort()
 {
     return m_port;
+}
+
+std::string
+HNodeDevice::getRestRootPath()
+{
+    return m_rootPath;
 }
 
 bool
@@ -479,25 +572,29 @@ HNodeDevice::clearProvidedService( std::string typeStr )
 }
 
 void
-HNodeDevice::registerProvidedService( std::string typeStr, std::string versionStr, std::string uri )
+HNodeDevice::registerProvidedServiceCustom( std::string typeStr, std::string versionStr, std::string uri )
 {
     HNDServiceRecord srvRec;
 
+    srvRec.setSpecType( HNDS_TYPE_CUSTOM );
+
     srvRec.setType( typeStr );
     srvRec.setVersion( versionStr );
-    srvRec.setURIFromStr( uri );
+    srvRec.setCustomURIFromStr( uri );
 
     m_advertisedServices.insert( std::pair<std::string, HNDServiceRecord>( typeStr, srvRec ) );
 }
 
 void
-HNodeDevice::registerProvidedServiceREST( std::string typeStr, std::string versionStr, std::string rootPath )
+HNodeDevice::registerProvidedServiceExtension( std::string typeStr, std::string versionStr, std::string extPath )
 {
     HNDServiceRecord srvRec;
 
+    srvRec.setSpecType( HNDS_TYPE_DEVICEREST );
+
     srvRec.setType( typeStr );
     srvRec.setVersion( versionStr );
-    srvRec.setURIFromStr( rootPath );
+    srvRec.setExtPath( extPath );
 
     m_advertisedServices.insert( std::pair<std::string, HNDServiceRecord>( typeStr, srvRec ) );
 }
@@ -552,12 +649,6 @@ HNodeDevice::enableHealthMonitoring()
 {
     m_health.setEnabled();
 
-    // Indicate support for healh information requests
-    registerProvidedServiceREST( "hnsrv-health-source", "1.0.0", "/hnode2/device/health" );
-
-    // Indicate support for sending health information
-    addDesiredService( "hnsrv-health-sink" );
-
     return HND_RESULT_SUCCESS;
 }
 
@@ -588,6 +679,11 @@ HNodeDevice::start()
 {
     std::string rstStr;
 
+    // Refresh the networking data for the current node
+    m_network.refreshData();
+
+    m_network.debugPrint();
+
 #if 0
     std::cout << "Looking for config file" << std::endl;
     
@@ -615,12 +711,30 @@ HNodeDevice::start()
 
     m_avObj.start();
 
+    // Setup device REST
+    m_rest.setPort( m_port );
+
+    // Register the devices root REST interface
+    // std::string devURI = m_rest.formatURI( m_network.getDefaultIPV4AddrStr(), "device" );
+    registerProvidedServiceExtension( "hnsrv-hnode2-device", "1.0.0", "device" );
+
+    // std::cout << "Default HNode URI: " << devURI << std::endl;
+
     std::cout << "Started HNAvahi..." << std::endl;
 
+    // Indicate support for healh information requests
     if( m_health.isEnabled() == true )
+    {
         m_health.init( createAvahiName(), m_hnodeID.getCRC32AsHexStr(), getName() );
 
-    m_rest.setPort( m_port );
+        // Indicate support for healh information requests
+        registerProvidedServiceExtension( "hnsrv-health-source", "1.0.0", "device/health" );
+
+        // Indicate support for sending health information
+        addDesiredService( "hnsrv-health-sink" );
+    }
+
+    // Start serving requests
     m_rest.start();
 }
 
@@ -807,7 +921,28 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
 
             jsService.set( "type", it->second.getType() );
             jsService.set( "version", it->second.getVersion() );
-            jsService.set( "uri", it->second.getURIAsStr() );
+
+            std::string uriStr;
+            switch( it->second.getSpecType() )
+            {
+                case HNDS_TYPE_DEVICEREST:
+                {
+                    // FIXME to handle address override cases, etc.
+                    uriStr = m_rest.formatURI( m_network.getDefaultIPV4AddrStr(), it->second.getExtPath() );
+                }
+                break;
+
+                case HNDS_TYPE_CUSTOM:
+                {
+                    uriStr = it->second.getCustomURIAsStr();
+                }
+                break;
+
+                // Mal-formed service record, move on.
+                default:
+                continue;
+            }
+            jsService.set( "uri", uriStr );
 
             jsProvidedServices.add( jsService );
         }
@@ -820,7 +955,6 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
 
             jsService.set( "type", it->second.getType() );
             jsService.set( "version", it->second.getVersion() );
-            jsService.set( "uri", it->second.getURIAsStr() );
 
             jsDesiredServices.add( jsService );
         }
@@ -856,7 +990,28 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
 
             jsService.set( "type", it->second.getType() );
             jsService.set( "version", it->second.getVersion() );
-            jsService.set( "uri", it->second.getURIAsStr() );
+
+            std::string uriStr;
+            switch( it->second.getSpecType() )
+            {
+                case HNDS_TYPE_DEVICEREST:
+                {
+                    // FIXME to handle address override cases, etc.
+                    uriStr = m_rest.formatURI( m_network.getDefaultIPV4AddrStr(), it->second.getExtPath() );
+                }
+                break;
+
+                case HNDS_TYPE_CUSTOM:
+                {
+                    uriStr = it->second.getCustomURIAsStr();
+                }
+                break;
+
+                // Mal-formed service record, move on.
+                default:
+                continue;
+            }
+            jsService.set( "uri", uriStr );
 
             jsProvidedServices.add( jsService );
         }
@@ -905,7 +1060,28 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
 
         jsService.set( "type", it->second.getType() );
         jsService.set( "version", it->second.getVersion() );
-        jsService.set( "uri", it->second.getURIAsStr() );
+
+        std::string uriStr;
+        switch( it->second.getSpecType() )
+        {
+            case HNDS_TYPE_DEVICEREST:
+            {
+                // FIXME to handle address override cases, etc.
+                uriStr = m_rest.formatURI( m_network.getDefaultIPV4AddrStr(), it->second.getExtPath() );
+            }
+            break;
+
+            case HNDS_TYPE_CUSTOM:
+            {
+                uriStr = it->second.getCustomURIAsStr();
+            }
+            break;
+
+            // Mal-formed service record, move on.
+            default:
+            break;
+        }
+        jsService.set( "uri", uriStr );
 
         // Render the response
         std::ostream& ostr = opData->responseSend();
@@ -936,7 +1112,6 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
 
             jsService.set( "type", it->second.getType() );
             jsService.set( "version", it->second.getVersion() );
-            jsService.set( "uri", it->second.getURIAsStr() );
 
             jsDesiredServices.add( jsService );
         }
@@ -1000,7 +1175,7 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
                 if( jsService->has( "uri" ) )
                 {
                     std::cout << "Mapping service: " << srvType << "  to: " << jsService->getValue<std::string>( "uri" );
-                    it->second.setURIFromStr( jsService->getValue<std::string>( "uri" ) );
+                    it->second.setCustomURIFromStr( jsService->getValue<std::string>( "uri" ) );
                     it->second.setMapped( true );
                 }
             }
@@ -1045,7 +1220,7 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
 
         jsService.set( "type", it->second.getType() );
         jsService.set( "version", it->second.getVersion() );
-        jsService.set( "uri", it->second.getURIAsStr() );
+        jsService.set( "uri", it->second.getCustomURIAsStr() );
 
         // Render the response
         std::ostream& ostr = opData->responseSend();

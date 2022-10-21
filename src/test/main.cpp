@@ -19,6 +19,7 @@
 #include "HNodeConfig.h"
 #include "HNFormatStrs.h"
 #include "HNDeviceHealth.h"
+#include "HNHostNetwork.h"
 
 #define MAXEVENTS 8
 
@@ -33,6 +34,7 @@ class HNode2TestApp : public Poco::Util::Application
         bool _hnodeConfigTest;
         bool _formatStrsTest;
         bool _deviceHealthTest;
+        bool _hostNetworkTest;
 
     protected:
         void initialize( Poco::Util::Application& application )
@@ -56,6 +58,7 @@ class HNode2TestApp : public Poco::Util::Application
             _hnodeConfigTest  = false;
             _formatStrsTest   = false;
             _deviceHealthTest = false;
+            _hostNetworkTest  = false;
 
             Poco::Util::Application::defineOptions( optionSet );
 
@@ -91,6 +94,9 @@ class HNode2TestApp : public Poco::Util::Application
                 Poco::Util::Option( "devicehealth", "x", "Run Device Health test." ).callback( Poco::Util::OptionCallback<HNode2TestApp>(this, &HNode2TestApp::handleTest ) )
             );
 
+            optionSet.addOption(
+                Poco::Util::Option( "hostNetwork", "n", "Run HNHostNetwork test." ).callback( Poco::Util::OptionCallback<HNode2TestApp>(this, &HNode2TestApp::handleTest ) )
+            );
         }
 
         void displayHelp()
@@ -128,7 +134,8 @@ class HNode2TestApp : public Poco::Util::Application
                 _formatStrsTest = true;
             else if( name == "devicehealth" )
                 _deviceHealthTest = true;
-
+            else if( name == "hostNetwork" )
+                _hostNetworkTest = true;
         }
 
         int main( const std::vector<std::string> &arguments )
@@ -425,6 +432,14 @@ class HNode2TestApp : public Poco::Util::Application
                 deviceHealth.getRestJSON( healthJSON );
 
                 std::cout << "=== HEALTH REST JSON (cycle 3)  ===" << std::endl << healthJSON << std::endl;                 
+            }
+            else if( _hostNetworkTest == true )
+            {
+                HNHostNetwork net;
+
+                net.refreshData();
+
+                net.debugPrint();         
             }
 
             //std::cout << "We are now in main. Option is " << this->config().getString( "optionval" ) << std::endl;

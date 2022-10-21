@@ -31,6 +31,7 @@ SET( HNODE2_LIB_SRC ${CMAKE_SOURCE_DIR}/src/lib/HNHttpServer.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNodeConfig.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNEPLoop.cpp
                     #${CMAKE_SOURCE_DIR}/src/lib/HNDeviceRestHandler.cpp
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNHostNetwork.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNodeDevice.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNFormatStrs.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNDeviceHealth.cpp
@@ -46,6 +47,7 @@ SET( HNODE2_LIB_HDR ${CMAKE_SOURCE_DIR}/src/lib/HNHttpServer.h
                     ${CMAKE_SOURCE_DIR}/src/lib/HNodeID.h
                     ${CMAKE_SOURCE_DIR}/src/lib/HNodeConfig.h
                     ${CMAKE_SOURCE_DIR}/src/lib/HNEPLoop.h
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNHostNetwork.h                    
                     ${CMAKE_SOURCE_DIR}/src/lib/HNodeDevice.h
                     ${CMAKE_SOURCE_DIR}/src/lib/HNFormatStrs.h
                     ${CMAKE_SOURCE_DIR}/src/lib/HNDeviceHealth.h
