@@ -370,6 +370,12 @@ HNodeDevice::getHNodeIDCRC32Str()
     return m_hnodeID.getCRC32AsHexStr();
 }
 
+uint32_t
+HNodeDevice::getHNodeIDCRC32()
+{
+    return m_hnodeID.getCRC32();
+}
+
 std::string
 HNodeDevice::getName()
 {
@@ -765,25 +771,6 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
         jsRoot.set( "deviceType", getDeviceType() );
         jsRoot.set( "version", getVersionStr() );
 
-        pjs::Array jsServices; 
-        
-        if( hasHealthMonitoring() )
-          jsServices.add( "health" );
-
-        if( hasEventing() )
-          jsServices.add( "event" );
-
-        if( hasLogging() )
-          jsServices.add( "logging" );
-
-        if( hasDataCollection() )
-          jsServices.add( "data" );
-
-        if( hasKeyValue() )
-          jsServices.add( "key-value" );
-
-        jsRoot.set( "desiredServices", jsServices );
-
         // Render the response
         std::ostream& ostr = opData->responseSend();
         try
@@ -955,6 +942,7 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
 
             jsService.set( "type", it->second.getType() );
             jsService.set( "version", it->second.getVersion() );
+            jsService.set( "mapped-uri", it->second.getCustomURIAsStr() );
 
             jsDesiredServices.add( jsService );
         }
@@ -1112,6 +1100,7 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
 
             jsService.set( "type", it->second.getType() );
             jsService.set( "version", it->second.getVersion() );
+            jsService.set( "mapped-uri", it->second.getCustomURIAsStr() );
 
             jsDesiredServices.add( jsService );
         }
@@ -1153,11 +1142,13 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
             // Get a pointer to the root object
             pjs::Array::Ptr jsRoot = varRoot.extract< pjs::Array::Ptr >();
 
+            pjs::Stringifier::stringify( jsRoot, std::cout, 1 );
+
             // Go through each object in the array
             for( uint i = 0; i < jsRoot->size(); i++ )
             {
                 // Make sure array member is an object
-                if( jsRoot->isObject( i ) )
+                if( jsRoot->isObject( i ) == false )
                     continue;
 
                 pjs::Object::Ptr jsService = jsRoot->getObject( i );
@@ -1172,10 +1163,11 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
                 if( it == m_desiredServices.end() )
                     continue;
 
-                if( jsService->has( "uri" ) )
+                if( jsService->has( "mapped-uri" ) )
                 {
-                    std::cout << "Mapping service: " << srvType << "  to: " << jsService->getValue<std::string>( "uri" );
-                    it->second.setCustomURIFromStr( jsService->getValue<std::string>( "uri" ) );
+                    std::cout << "Mapping service: " << srvType << "  to: " << jsService->getValue<std::string>( "mapped-uri" ) << std::endl;
+
+                    it->second.setCustomURIFromStr( jsService->getValue<std::string>( "mapped-uri" ) );
                     it->second.setMapped( true );
                 }
             }
@@ -1220,7 +1212,7 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
 
         jsService.set( "type", it->second.getType() );
         jsService.set( "version", it->second.getVersion() );
-        jsService.set( "uri", it->second.getCustomURIAsStr() );
+        jsService.set( "mapped-uri", it->second.getCustomURIAsStr() );
 
         // Render the response
         std::ostream& ostr = opData->responseSend();
@@ -1259,9 +1251,8 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
 
             // Get a pointer to the root object
             pjs::Object::Ptr jsRoot = varRoot.extract< pjs::Object::Ptr >();
-
-            if( ("health" == serviceType) && hasHealthMonitoring() )
-            {
+// FIXME
+#if 0
                 if( jsRoot->has( "rootURI" ) )
                 {
                     m_health.setServiceRootURIFromStr( jsRoot->getValue< std::string >( "rootURI" ) );
@@ -1270,7 +1261,7 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
                 {
                     m_health.clearService();
                 }
-            }
+#endif          
         }
         catch( Poco::Exception ex )
         {

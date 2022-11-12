@@ -205,6 +205,7 @@ class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
 
         std::string getHNodeIDStr();
         std::string getHNodeIDCRC32Str();
+        uint32_t getHNodeIDCRC32();
 
         std::string getName();
 
