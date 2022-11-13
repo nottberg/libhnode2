@@ -1,3 +1,4 @@
+#include <sstream>
 #include <cstdarg>
 #include <cstdio>
 #include <mutex>
@@ -229,7 +230,7 @@ HNDHComponent::getChildListRef()
     return m_children;
 }
 
-HNDeviceHealth::HNDeviceHealth( HNFormatStringStore *stringStore )
+HNDeviceHealth::HNDeviceHealth( HNFormatStringStore *stringStore, HNHttpEventClient *evClient )
 : m_devStatus( HNDH_ROOT_COMPID, "Device Health" )
 {
     m_enabled = false;
@@ -237,6 +238,8 @@ HNDeviceHealth::HNDeviceHealth( HNFormatStringStore *stringStore )
     m_lockedForUpdate = false;
 
     m_stringStore = stringStore;
+
+    m_evClient = evClient;
 
     std::cout << "Root ID: " << m_devStatus.getID() << std::endl;
 
@@ -393,6 +396,24 @@ HNDeviceHealth::completeUpdateCycle()
 
     // Don't allow status updates
     m_lockedForUpdate = false;
+
+    // If the status changed, and the sink is setup then generate a change event
+    if( ( m_statusChange == true ) && ( m_sinkURI.empty() == false ) && ( m_evClient != NULL ) )
+    {
+        pjs::Object jsRoot;
+
+        jsRoot.set( "devID", m_deviceCRC32 );
+        jsRoot.set( "devStatus", m_devStatus.getPropagatedStatusAsStr() );
+
+        std::stringstream payload;
+        try {
+            pjs::Stringifier::stringify( jsRoot, payload, 1 );
+        } catch( ... ) {
+        }
+
+        std::string evURI = m_sinkURI + "/event";
+        m_evClient->submitPostEvent( evURI, "application/json", payload.str() );
+    }
 
     // Release the access mutex since the update operation 
     // has completed.
@@ -710,20 +731,20 @@ HNDeviceHealth::getRestJSON( std::ostream &oStream )
 }
 
 void
-HNDeviceHealth::clearService()
+HNDeviceHealth::clearSinkMapping()
 {
-    m_serviceRootURI.clear();
+    m_sinkURI.clear();
 }
 
 void
-HNDeviceHealth::setServiceRootURIFromStr( std::string value )
+HNDeviceHealth::checkSinkMapping( std::string uri )
 {
-    std::cout << "HNDeviceHealth::setServiceRootURIFromStr - uri: " << value << std::endl;
-    m_serviceRootURI = value;
+    std::cout << "HNDeviceHealth::checkSinkMapping - uri: " << uri << std::endl;
+    m_sinkURI = uri;
 }
 
 std::string
-HNDeviceHealth::getServiceRootURIAsStr()
+HNDeviceHealth::getSinkMapping()
 {
-    return m_serviceRootURI;
+    return m_sinkURI;
 }

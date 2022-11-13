@@ -6,6 +6,7 @@
 #include <map>
 #include <mutex>
 
+#include "HNHttpEventClient.h"
 #include "HNFormatStrs.h"
 
 #define HNDH_ROOT_COMPID  "c0"
@@ -106,7 +107,7 @@ class HNDHComponent
 class HNDeviceHealth
 {
     public:
-        HNDeviceHealth( HNFormatStringStore *stringStore );
+        HNDeviceHealth( HNFormatStringStore *stringStore, HNHttpEventClient *evClient );
        ~HNDeviceHealth();
 
         void setEnabled();
@@ -137,9 +138,9 @@ class HNDeviceHealth
         HNDH_RESULT_T getRestJSON( std::string &jsonStr );
         HNDH_RESULT_T getRestJSON( std::ostream &oStream );
 
-        void clearService();
-        void setServiceRootURIFromStr( std::string value );
-        std::string getServiceRootURIAsStr();
+        void clearSinkMapping();
+        void checkSinkMapping( std::string uri );
+        std::string getSinkMapping();
 
     private:
         HNDH_RESULT_T allocUniqueID( std::string &compID );
@@ -177,8 +178,11 @@ class HNDeviceHealth
         // Access to registered format strings for status and note messages.
         HNFormatStringStore *m_stringStore;
 
-        // Keep track of the service url for push notifications of health changes.
-        std::string m_serviceRootURI;
+        // Handle sends to a mapped health sink
+        HNHttpEventClient *m_evClient;
+
+        // Keep track of the sink uri for push notifications of health changes.
+        std::string m_sinkURI;
 };
 
 #endif // __HN_DEVICE_HEALTH_H__

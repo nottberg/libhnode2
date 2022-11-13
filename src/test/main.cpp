@@ -344,8 +344,9 @@ class HNode2TestApp : public Poco::Util::Application
             {
                 std::cout << "Running Device Health test..." << std::endl;
 
+                HNHttpEventClient evClient;
                 HNFormatStringStore  strStore;
-                HNDeviceHealth deviceHealth( &strStore );
+                HNDeviceHealth deviceHealth( &strStore, &evClient );
 
                 // Register format strings
                 uint warncode = 0;

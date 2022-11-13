@@ -202,7 +202,7 @@ HNDServiceRecord::getProviderURIAsStr()
 }
 
 HNodeDevice::HNodeDevice()
-: m_health( &m_stringStore )
+: m_health( &m_stringStore, &m_evClient )
 {
     m_configChange = false;
     m_notifySink = NULL;
@@ -226,7 +226,7 @@ HNodeDevice::HNodeDevice()
 }
 
 HNodeDevice::HNodeDevice( std::string deviceType, std::string instance )
-: m_health( &m_stringStore )
+: m_health( &m_stringStore, &m_evClient )
 {
     m_configChange = false;
     m_notifySink = NULL;
@@ -744,6 +744,35 @@ HNodeDevice::start()
     m_rest.start();
 }
 
+void
+HNodeDevice::checkServiceMappingUpdates()
+{
+    std::map< std::string, HNDServiceRecord >::iterator it;
+    
+    // Check if the health service endpoint has updated
+    it = m_desiredServices.find( "hnsrv-health-sink" );
+    if( it != m_desiredServices.end() )
+    {
+        if( it->second.isMapped() == true )
+            m_health.checkSinkMapping( it->second.getCustomURIAsStr() );
+        else
+            m_health.clearSinkMapping();
+    }
+
+    // Check if the log service endpoint has updated
+    it = m_desiredServices.find( "hnsrv-log-sink" );
+    if( it != m_desiredServices.end() )
+    {
+#if 0      
+        if( it->second.isMapped() == true )
+            m_log.checkSinkMapping( it->second.getCustomURIAsStr() );
+        else
+            m_log.clearSinkMapping();
+#endif            
+    }
+
+}
+
 void 
 HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
 {
@@ -1172,8 +1201,8 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
                 }
             }
 
-            // m_health.setServiceRootURIFromStr( jsSvcObj->getValue< std::string >( "rootURI" ) );
-
+            // Check if device services had thier endpoint updated.
+            checkServiceMappingUpdates();
         }
         catch( Poco::Exception ex )
         {

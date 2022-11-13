@@ -129,53 +129,6 @@ class HNDServiceRecord
 
 class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
 {
-    private:
-        std::mutex   m_configMutex;
-        bool         m_configChange;
-
-        std::string  m_devType;
-        std::string  m_devInstance;
-        std::string  m_version;
-
-        HNHostNetwork m_network;
-        std::string   m_address;
-        uint16_t      m_port;
-        std::string   m_rootPath;
-
-        HNodeID      m_hnodeID;
-
-        std::string  m_name;
-
-        bool         m_owned;
-        bool         m_available;
-        HNodeID      m_ownerHNodeID;
-
-        std::map< std::string, HNDEndpoint > m_endpointMap;
-
-        HNAvahi      m_avObj;
-
-        HNDEventNotifyInf *m_notifySink;
-
-        HNHttpServer m_rest;
-
-        // Track the services that this hnode provides.
-        std::map< std::string, HNDServiceRecord > m_advertisedServices;
-
-        // Track the services that this hnode desires to consume.
-        std::map< std::string, HNDServiceRecord > m_desiredServices;
-
-        // Store string references for hnode components.
-        HNFormatStringStore m_stringStore;
-
-        // Implement built-in support for hnode health monitoring.
-        HNDeviceHealth m_health;
-
-        std::string createAvahiName();
-
-        //bool configExists();
-        //HND_RESULT_T loadConfig();
-        //HND_RESULT_T saveConfig();
-
     public:
         HNodeDevice();
         HNodeDevice( std::string deviceType, std::string devInstance );
@@ -269,6 +222,58 @@ class HNodeDevice : public HNRestDispatchInterface, public HNDEPDispatchInf
         virtual void dispatchEP( HNodeDevice *parent, HNOperationData *opData );
 
         virtual void restDispatch( HNOperationData *opData );
+
+    private:
+        std::mutex   m_configMutex;
+        bool         m_configChange;
+
+        std::string  m_devType;
+        std::string  m_devInstance;
+        std::string  m_version;
+
+        HNHostNetwork m_network;
+        std::string   m_address;
+        uint16_t      m_port;
+        std::string   m_rootPath;
+
+        HNodeID      m_hnodeID;
+
+        std::string  m_name;
+
+        bool         m_owned;
+        bool         m_available;
+        HNodeID      m_ownerHNodeID;
+
+        std::map< std::string, HNDEndpoint > m_endpointMap;
+
+        HNAvahi      m_avObj;
+
+        HNDEventNotifyInf *m_notifySink;
+
+        HNHttpServer m_rest;
+
+        // Track the services that this hnode provides.
+        std::map< std::string, HNDServiceRecord > m_advertisedServices;
+
+        // Track the services that this hnode desires to consume.
+        std::map< std::string, HNDServiceRecord > m_desiredServices;
+
+        // Provide a client for sending push notifications
+        HNHttpEventClient m_evClient;
+
+        // Store string references for hnode components.
+        HNFormatStringStore m_stringStore;
+
+        // Implement built-in support for hnode health monitoring.
+        HNDeviceHealth m_health;
+
+        std::string createAvahiName();
+
+        //bool configExists();
+        //HND_RESULT_T loadConfig();
+        //HND_RESULT_T saveConfig();
+
+        void checkServiceMappingUpdates();        
 };
 
 #endif // __HNODE_DEVICE_H__
