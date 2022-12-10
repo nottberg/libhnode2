@@ -336,7 +336,7 @@ class HNode2TestApp : public Poco::Util::Application
 
                 HNFSInstance instance;
 
-                strStore.fillInstance( msgcode, instance, 20, "Test 1", 16, 4.556 );
+                strStore.fillInstance( msgcode, &instance, 20, "Test 1", 16, 4.556 );
 
                 std::cout << "Instance Result Str: " << instance.getResultStr() << std::endl;
             }

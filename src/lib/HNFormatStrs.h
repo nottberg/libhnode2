@@ -54,7 +54,7 @@ class HNFormatString
 
         HNFS_RESULT_T validateFormat();
 
-        HNFS_RESULT_T applyParameters( va_list vargs, HNFSInstance &instance );
+        HNFS_RESULT_T applyParameters( va_list vargs, HNFSInstance *instance );
 
     private:
         void calcCode();
@@ -75,11 +75,23 @@ class HNFormatStringStore
 
         HNFS_RESULT_T registerFormatString( std::string formatStr, uint &code );
 
-        HNFS_RESULT_T fillInstance( uint fmtCode, va_list vargs, HNFSInstance &instance );
-        HNFS_RESULT_T fillInstance( uint fmtCode, HNFSInstance &instance, ... );
+        HNFS_RESULT_T fillInstance( uint fmtCode, va_list vargs, HNFSInstance *instance );
+        HNFS_RESULT_T fillInstance( uint fmtCode, HNFSInstance *instance, ... );
         
     private:
         std::map< uint, HNFormatString > m_formatStrs;
+};
+
+// Cache Format Strings for local use
+// Used by clients to cache strings from devices
+class HNFormatStringCache
+{
+    public:
+        HNFormatStringCache();
+       ~HNFormatStringCache();
+        
+    private:
+        // std::map< uint, HNFormatString > m_formatStrs;
 };
 
 #endif // __HN_FORMAT_STRS_H__

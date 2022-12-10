@@ -132,14 +132,14 @@ HNFormatString::validateFormat()
 }
 
 HNFS_RESULT_T 
-HNFormatString::applyParameters( va_list vargs, HNFSInstance &instance )
+HNFormatString::applyParameters( va_list vargs, HNFSInstance *instance )
 {
     char        tmpBuf[4096];
     std::string builtStr;
     char        pName[64];
     bool        changed = false;
  
-    std::vector< std::string > &paramList = instance.getParamListRef();
+    std::vector< std::string > &paramList = instance->getParamListRef();
 
     paramList.clear();
     builtStr = m_templateStr;
@@ -154,7 +154,7 @@ HNFormatString::applyParameters( va_list vargs, HNFSInstance &instance )
         builtStr.replace( pos, pLen, tmpBuf );
     }
 
-    std::string &resultStr = instance.getResultStrRef();
+    std::string &resultStr = instance->getResultStrRef();
 
     if( resultStr.size() != builtStr.size() )
     {
@@ -208,11 +208,11 @@ HNFormatStringStore::registerFormatString( std::string formatStr, uint &code )
 }
 
 HNFS_RESULT_T
-HNFormatStringStore::fillInstance( uint fmtCode, va_list vargs, HNFSInstance &instance )
+HNFormatStringStore::fillInstance( uint fmtCode, va_list vargs, HNFSInstance *instance )
 {
     bool changed = false;
 
-    instance.clear();
+    instance->clear();
 
     // Look up the format string
     std::map< uint, HNFormatString >::iterator it = m_formatStrs.find( fmtCode );
@@ -223,9 +223,9 @@ HNFormatStringStore::fillInstance( uint fmtCode, va_list vargs, HNFSInstance &in
     }
 
     // Set the instance string code
-    if( instance.getFmtCode() != fmtCode )
+    if( instance->getFmtCode() != fmtCode )
     {
-        instance.setFmtCode( fmtCode );
+        instance->setFmtCode( fmtCode );
         changed = true;
     }
 
@@ -239,7 +239,7 @@ HNFormatStringStore::fillInstance( uint fmtCode, va_list vargs, HNFSInstance &in
 }
 
 HNFS_RESULT_T
-HNFormatStringStore::fillInstance( uint fmtCode, HNFSInstance &instance, ... )
+HNFormatStringStore::fillInstance( uint fmtCode, HNFSInstance *instance, ... )
 {
     va_list vargs;
     HNFS_RESULT_T result = HNFS_RESULT_FAILURE;
@@ -250,4 +250,14 @@ HNFormatStringStore::fillInstance( uint fmtCode, HNFSInstance &instance, ... )
     va_end( vargs );
 
     return result;
+}
+
+HNFormatStringCache::HNFormatStringCache()
+{
+
+}
+
+HNFormatStringCache::~HNFormatStringCache()
+{
+
 }

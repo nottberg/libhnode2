@@ -16,6 +16,7 @@ typedef enum HNDeviceHealthResultEnum {
     HNDH_RESULT_FAILURE
 }HNDH_RESULT_T;
 
+#if 0
 class HNDHFormatStr
 {
     public:
@@ -26,6 +27,7 @@ class HNDHFormatStr
         uint        m_code;
         std::string m_formatStr;
 };
+#endif
 
 typedef enum HNDHComponentStandardStatusEnum {
     HNDH_CSTAT_UNKNOWN,
@@ -37,27 +39,27 @@ typedef enum HNDHComponentStandardStatusEnum {
 class HNDHComponent
 {
     public:
-        HNDHComponent( std::string compID, std::string componentName );
+        HNDHComponent( std::string compID );
        ~HNDHComponent(); 
 
         void clear();
        
         void setID( std::string idStr );
 
-        void setName( std::string compName );
-
         void setStatus( HNDH_CSTAT_T status );
+        void setStatusFromStr( std::string status );
 
         void setPropagatedStatus( HNDH_CSTAT_T status );
+        void setPropagatedStatusFromStr( std::string status );
 
         void setErrorCode( uint code );
 
         void setParentID( std::string parentID );
 
         void setUpdateTimestamp( time_t updateTS );
+        //void setUpdateTimestampFromStr( std::string updateTS );
 
         std::string getID();
-        std::string getComponentName();
 
         HNDH_CSTAT_T getStatus();
         std::string getStatusAsStr();
@@ -66,18 +68,32 @@ class HNDHComponent
         std::string getPropagatedStatusAsStr();
 
         time_t getLastUpdateTime();
-        std::string getLastUpdateTimeAsStr();
+        //std::string getLastUpdateTimeAsStr();
 
         uint getErrorCode();
         
-        std::string getRenderedMsg();
+        std::string getRenderedName();
+        std::string getRenderedDesc();
         std::string getRenderedNote();
 
-        void clearMsgInstance();
-        HNFSInstance& getMsgInstanceRef();
+        std::string getRenderedMsg();
+
+        void clearNameInstance();
+        HNFSInstance* getNameInstancePtr();
+
+        void clearDescInstance();
+        HNFSInstance* getDescInstancePtr();
 
         void clearNoteInstance();
-        HNFSInstance& getNoteInstanceRef();
+        HNFSInstance* getNoteInstancePtr();
+
+        void clearMsgInstance();
+        HNFSInstance* getMsgInstancePtr();
+
+        HNDHComponent *getChildComponent( std::string compID );
+        HNDHComponent *getChildComponent( uint index );
+        
+        HNDHComponent *getOrCreateChildComponent( std::string compID, bool &childCreated );
 
         void addChildComponent( HNDHComponent *childComp );
 
@@ -85,17 +101,17 @@ class HNDHComponent
 
     private:
         std::string m_compID;
-        std::string m_compName;
 
         HNDH_CSTAT_T m_stdStatus;
 
         HNDH_CSTAT_T m_propagatedStatus;
 
-        uint m_errCode;
-
-        HNFSInstance m_msgInstance;
-
+        HNFSInstance m_nameInstance;
+        HNFSInstance m_descInstance;
         HNFSInstance m_noteInstance;
+
+        uint m_errCode;
+        HNFSInstance m_msgInstance;
 
         std::string m_parentID;
 
@@ -129,6 +145,9 @@ class HNDeviceHealth
 
         void setComponentStatus( std::string compID, HNDH_CSTAT_T stdStatus );
 
+        void clearComponentDesc( std::string compID );
+        void setComponentDesc( std::string compID, std::string descStr );
+
         void clearComponentErrMsg( std::string compID );
         void setComponentErrMsg( std::string compID, uint errCode, uint fmtCode, ... );
 
@@ -142,12 +161,17 @@ class HNDeviceHealth
         void checkSinkMapping( std::string uri );
         std::string getSinkMapping();
 
+        static HNDHComponent* allocateNewComponent( std::string compID );
+        static void freeComponent( HNDHComponent *rootComp );
+        static void freeComponentTree( HNDHComponent *rootComp );
+
     private:
         HNDH_RESULT_T allocUniqueID( std::string &compID );
 
         HNDH_CSTAT_T propagateChild( HNDHComponent *comp, bool &changed );
         bool propagateStatus();
 
+        void populateStrInstJSONObject( void *instObj, HNFSInstance *strInst );
         HNDH_RESULT_T addCompJSONObject( void *listPtr, HNDHComponent *comp );
 
         // Guard for multi-threaded access to health data.
@@ -161,7 +185,7 @@ class HNDeviceHealth
         std::string m_deviceCRC32;
 
         // Root of health status tree 
-        HNDHComponent m_devStatus;
+        HNDHComponent *m_devStatus;
 
         // Health status for monitored components
         std::map< std::string, HNDHComponent* > m_compStatus;
@@ -183,6 +207,29 @@ class HNDeviceHealth
 
         // Keep track of the sink uri for push notifications of health changes.
         std::string m_sinkURI;
+};
+
+// Used by clients to cache health information from multiple 
+// device providers
+class HNHealthCache
+{
+    public:
+        HNHealthCache();
+       ~HNHealthCache();
+
+        void setFormatStringCache( HNFormatStringCache *strCachePtr );
+
+        HNDH_RESULT_T updateDeviceHealth( std::string devCRC32ID, std::istream& bodyStream, bool &changed );
+
+    private:
+
+        HNFormatStringCache *m_strCache;
+
+        std::map< std::string, HNDHComponent* > m_devHealthTreeMap;
+
+        HNDH_RESULT_T handleHealthComponentStrInstanceUpdate( void *jsSIPtr, HNFSInstance *strInstPtr, bool &changed );
+        HNDH_RESULT_T handleHealthComponentUpdate( void *jsCompPtr, HNDHComponent *compPtr, bool &changed );
+        HNDH_RESULT_T handleHealthComponentChildren( void *jsCompPtr, HNDHComponent *rootComponent, bool &changed );
 };
 
 #endif // __HN_DEVICE_HEALTH_H__
