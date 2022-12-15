@@ -67,7 +67,13 @@ class HNFormatString
         std::vector< std::string > m_formatSpecs;
 };
 
-class HNFormatStringStore
+class HNRenderStringIntf
+{
+    public:
+        virtual std::string renderInstance( HNFSInstance *instance ) = 0;
+};
+
+class HNFormatStringStore : public HNRenderStringIntf
 {
     public:
         HNFormatStringStore();
@@ -78,18 +84,24 @@ class HNFormatStringStore
         HNFS_RESULT_T fillInstance( uint fmtCode, va_list vargs, HNFSInstance *instance );
         HNFS_RESULT_T fillInstance( uint fmtCode, HNFSInstance *instance, ... );
         
+        virtual std::string renderInstance( HNFSInstance *instance );
+
     private:
         std::map< uint, HNFormatString > m_formatStrs;
 };
 
 // Cache Format Strings for local use
 // Used by clients to cache strings from devices
-class HNFormatStringCache
+class HNFormatStringCache : public HNRenderStringIntf
 {
     public:
         HNFormatStringCache();
        ~HNFormatStringCache();
         
+        void reportFormatCode( uint fmtCode );
+        
+        virtual std::string renderInstance( HNFSInstance *instance );
+
     private:
         // std::map< uint, HNFormatString > m_formatStrs;
 };

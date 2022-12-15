@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <set>
 #include <mutex>
 
 #include "HNHttpEventClient.h"
@@ -68,15 +69,17 @@ class HNDHComponent
         std::string getPropagatedStatusAsStr();
 
         time_t getLastUpdateTime();
-        //std::string getLastUpdateTimeAsStr();
+        std::string getLastUpdateTimeAsStr();
 
         uint getErrorCode();
         
+        /*
         std::string getRenderedName();
         std::string getRenderedDesc();
         std::string getRenderedNote();
 
         std::string getRenderedMsg();
+        */
 
         void clearNameInstance();
         HNFSInstance* getNameInstancePtr();
@@ -92,12 +95,17 @@ class HNDHComponent
 
         HNDHComponent *getChildComponent( std::string compID );
         HNDHComponent *getChildComponent( uint index );
-        
+
         HNDHComponent *getOrCreateChildComponent( std::string compID, bool &childCreated );
 
         void addChildComponent( HNDHComponent *childComp );
 
+        void getChildIDs( std::set< std::string > &childIDs );
+        void deleteChildByID( std::string compID );
+
         std::vector< HNDHComponent* >& getChildListRef();
+
+        void debugPrint( uint offset, HNRenderStringIntf *renderIntf, bool printChildren );
 
     private:
         std::string m_compID;
@@ -132,7 +140,7 @@ class HNDeviceHealth
         void clear();
 
         // Initialize the root component
-        HNDH_RESULT_T init( std::string deviceID, std::string deviceCRC32, std::string deviceName );
+        HNDH_RESULT_T updateDeviceInfo( std::string deviceID, std::string deviceCRC32, std::string deviceName );
 
         // Register a component that has monitored health status.
         HNDH_RESULT_T registerComponent( std::string componentName, std::string parentID, std::string &compID );
@@ -165,6 +173,8 @@ class HNDeviceHealth
         static void freeComponent( HNDHComponent *rootComp );
         static void freeComponentTree( HNDHComponent *rootComp );
 
+        void debugPrint();
+
     private:
         HNDH_RESULT_T allocUniqueID( std::string &compID );
 
@@ -173,6 +183,8 @@ class HNDeviceHealth
 
         void populateStrInstJSONObject( void *instObj, HNFSInstance *strInst );
         HNDH_RESULT_T addCompJSONObject( void *listPtr, HNDHComponent *comp );
+
+        std::string renderStringInstance( HNFSInstance *strInst );
 
         // Guard for multi-threaded access to health data.
         std::mutex m_accessMutex;
@@ -183,6 +195,7 @@ class HNDeviceHealth
         // The device ID
         std::string m_deviceID;
         std::string m_deviceCRC32;
+        std::string m_deviceName;
 
         // Root of health status tree 
         HNDHComponent *m_devStatus;
@@ -221,7 +234,13 @@ class HNHealthCache
 
         HNDH_RESULT_T updateDeviceHealth( std::string devCRC32ID, std::istream& bodyStream, bool &changed );
 
+        std::string getHealthReportAsJSON();
+
+        void debugPrintHealthReport();
+
     private:
+
+        std::string renderStringInstance( HNFSInstance *strInst );
 
         HNFormatStringCache *m_strCache;
 
@@ -230,6 +249,7 @@ class HNHealthCache
         HNDH_RESULT_T handleHealthComponentStrInstanceUpdate( void *jsSIPtr, HNFSInstance *strInstPtr, bool &changed );
         HNDH_RESULT_T handleHealthComponentUpdate( void *jsCompPtr, HNDHComponent *compPtr, bool &changed );
         HNDH_RESULT_T handleHealthComponentChildren( void *jsCompPtr, HNDHComponent *rootComponent, bool &changed );
+
 };
 
 #endif // __HN_DEVICE_HEALTH_H__

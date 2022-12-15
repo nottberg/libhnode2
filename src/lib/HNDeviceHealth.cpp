@@ -2,6 +2,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <mutex>
+#include <iomanip>
 
 #include <Poco/JSON/Object.h>
 #include <Poco/JSON/Parser.h>
@@ -112,8 +113,8 @@ HNDHComponent::setStatusFromStr( std::string status )
         m_stdStatus = HNDH_CSTAT_DEGRADED;
     else if( status == "FAILED" )
         m_stdStatus = HNDH_CSTAT_FAILED;
-
-    m_stdStatus = HNDH_CSTAT_UNKNOWN;
+    else
+        m_stdStatus = HNDH_CSTAT_UNKNOWN;
 }
 
 std::string
@@ -147,13 +148,13 @@ void
 HNDHComponent::setPropagatedStatusFromStr( std::string status )
 {
     if( status == "OK" )
-        m_stdStatus = HNDH_CSTAT_OK;
+        m_propagatedStatus = HNDH_CSTAT_OK;
     else if( status == "DEGRADED")
-        m_stdStatus = HNDH_CSTAT_DEGRADED;
+        m_propagatedStatus = HNDH_CSTAT_DEGRADED;
     else if( status == "FAILED" )
-        m_stdStatus = HNDH_CSTAT_FAILED;
-
-    m_stdStatus = HNDH_CSTAT_UNKNOWN;
+        m_propagatedStatus = HNDH_CSTAT_FAILED;
+    else
+        m_propagatedStatus = HNDH_CSTAT_UNKNOWN;
 }
 
 std::string
@@ -183,7 +184,6 @@ HNDHComponent::getLastUpdateTime()
     return m_lastUpdateTS;
 }
 
-/*
 std::string
 HNDHComponent::getLastUpdateTimeAsStr()
 {
@@ -192,7 +192,7 @@ HNDHComponent::getLastUpdateTimeAsStr()
     return tmpBuf;
 }
 
-
+/*
 void
 HNDHComponent::setUpdateTimestampFromStr( std::string updateTS )
 {
@@ -213,6 +213,7 @@ HNDHComponent::getErrorCode()
     return m_errCode;
 }
 
+/*
 std::string
 HNDHComponent::getRenderedName()
 {
@@ -236,6 +237,7 @@ HNDHComponent::getRenderedNote()
 {
     return m_noteInstance.getResultStr();
 }
+*/
 
 void
 HNDHComponent::clearNameInstance()
@@ -336,10 +338,59 @@ HNDHComponent::addChildComponent( HNDHComponent *childComp )
     m_children.push_back( childComp );
 }
 
+void
+HNDHComponent::getChildIDs( std::set< std::string > &childIDs )
+{
+    // Get all of the current childIDs
+    for( std::vector< HNDHComponent* >::iterator it = m_children.begin(); it != m_children.end(); it++ )
+    {
+        childIDs.insert( (*it)->getID() );
+    }
+}
+
+void
+HNDHComponent::deleteChildByID( std::string compID )
+{
+    // Find a child id and remove it.
+    for( std::vector< HNDHComponent* >::iterator it = m_children.begin(); it != m_children.end(); it++ )
+    {
+        if( (*it)->getID() == compID )
+        {
+            std::cout << "Deleting child component: " << compID << std::endl;
+            HNDeviceHealth::freeComponent( *it );
+            m_children.erase( it );
+            return;
+        } 
+    }
+}
+
 std::vector< HNDHComponent* >& 
 HNDHComponent::getChildListRef()
 {
     return m_children;
+}
+
+void
+HNDHComponent::debugPrint( uint offset, HNRenderStringIntf *renderIntf, bool printChildren )
+{
+    std::cout << std::endl;
+    std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "id" << ": " << getID() << std::endl;
+    std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "name" << ": " << renderIntf->renderInstance( getNameInstancePtr() ) << std::endl;
+    //std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "desc" << ": " << getRenderedDesc() << std::endl;
+    std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "status" << ": " << getStatusAsStr() << std::endl;
+    std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "propagated status" << ": " << getPropagatedStatusAsStr() << std::endl;
+    std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "time" << ": " << getLastUpdateTimeAsStr() << std::endl;
+    //std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "note" << ": " << getRenderedNote() << std::endl;
+    std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "error code" << ": " << getErrorCode() << std::endl;
+    //std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "error msg" << ": " << getRenderedMsg() << std::endl;
+
+    if( printChildren == false )
+        return;
+
+    for( std::vector< HNDHComponent* >::iterator it = m_children.begin(); it != m_children.end(); it++ )
+    {
+        (*it)->debugPrint( offset+4, renderIntf, true );
+    }
 }
 
 HNDeviceHealth::HNDeviceHealth( HNFormatStringStore *stringStore, HNHttpEventClient *evClient )
@@ -355,9 +406,7 @@ HNDeviceHealth::HNDeviceHealth( HNFormatStringStore *stringStore, HNHttpEventCli
 
     m_evClient = evClient;
 
-    //std::cout << "Root ID: " << m_devStatus.getID() << std::endl;
-
-    //m_compStatus.insert( std::pair< std::string, HNDHComponent* >( m_devStatus.getID(), &m_devStatus ) );
+    m_deviceName = "HNode Default Health Component";
 }
 
 HNDeviceHealth::~HNDeviceHealth()
@@ -372,7 +421,22 @@ HNDeviceHealth::~HNDeviceHealth()
 void 
 HNDeviceHealth::setEnabled()
 {
-    m_enabled = true;
+    if( m_enabled == false )
+    {
+        m_enabled = true;
+
+        // Grab the scope lock
+        const std::lock_guard< std::mutex > lock( m_accessMutex );
+
+        m_devStatus = HNDeviceHealth::allocateNewComponent( HNDH_ROOT_COMPID );
+        m_devStatus->setStatus( HNDH_CSTAT_UNKNOWN );
+
+        uint NameSID;
+        m_stringStore->registerFormatString( m_deviceName, NameSID );
+        m_devStatus->getNameInstancePtr()->setFmtCode( NameSID );
+
+        m_compStatus.insert( std::pair< std::string, HNDHComponent* >( m_devStatus->getID(), m_devStatus ) );
+    }
 }
 
 bool 
@@ -392,14 +456,9 @@ HNDeviceHealth::clear()
     m_compStatus.clear();
     
     if( m_devStatus )
-    {
         HNDeviceHealth::freeComponentTree( m_devStatus );
-        m_devStatus = NULL;
-    }
-
-    //std::cout << "Root ID 2: " << m_devStatus.getID() << std::endl;
-
-    //m_compStatus.insert( std::pair< std::string, HNDHComponent* >( m_devStatus.getID(), &m_devStatus ) );
+        
+    m_devStatus = NULL;
 
     m_enabled = false;
 }
@@ -434,28 +493,24 @@ HNDeviceHealth::allocUniqueID( std::string &compID )
 }
 
 HNDH_RESULT_T
-HNDeviceHealth::init( std::string deviceID, std::string deviceCRC32, std::string deviceName )
+HNDeviceHealth::updateDeviceInfo( std::string deviceID, std::string deviceCRC32, std::string deviceName )
 {
+    std::cout << "HNDeviceHealth::init" << std::endl;
+
     // Grab the scope lock
     const std::lock_guard< std::mutex > lock( m_accessMutex );
 
     m_deviceID    = deviceID;
     m_deviceCRC32 = deviceCRC32;
+    m_deviceName  = deviceName;
 
-    if( m_devStatus )
-    {
-        HNDeviceHealth::freeComponentTree( m_devStatus );
-        m_devStatus = NULL;
-    }
-
-    m_devStatus = HNDeviceHealth::allocateNewComponent( HNDH_ROOT_COMPID );
-    m_devStatus->setStatus( HNDH_CSTAT_UNKNOWN );
+    // Only allow when enabled
+    if( m_enabled == false )
+        return HNDH_RESULT_SUCCESS;
 
     uint NameSID;
-    m_stringStore->registerFormatString( deviceName, NameSID );
+    m_stringStore->registerFormatString( m_deviceName, NameSID );
     m_devStatus->getNameInstancePtr()->setFmtCode( NameSID );
-
-    m_compStatus.insert( std::pair< std::string, HNDHComponent* >( m_devStatus->getID(), m_devStatus ) );
 
     return HNDH_RESULT_SUCCESS;
 }
@@ -464,6 +519,10 @@ HNDH_RESULT_T
 HNDeviceHealth::registerComponent( std::string componentName, std::string parentID, std::string &compID )
 {
     HNDHComponent *parent;
+
+    // Only allow when enabled
+    if( m_enabled == false )
+        return HNDH_RESULT_SUCCESS;
 
     // Grab the scope lock
     const std::lock_guard< std::mutex > lock( m_accessMutex );
@@ -499,6 +558,8 @@ HNDeviceHealth::registerComponent( std::string componentName, std::string parent
 
     parent->addChildComponent( newComp );
 
+    m_devStatus->debugPrint( 4, m_stringStore, true );
+
     return HNDH_RESULT_SUCCESS;
 }
 
@@ -506,6 +567,10 @@ HNDeviceHealth::registerComponent( std::string componentName, std::string parent
 void
 HNDeviceHealth::startUpdateCycle( time_t updateTimestamp )
 {
+    // Only allow when enabled
+    if( m_enabled == false )
+        return;
+
     // Look the access mutex, which will be unlocked with a mandatory
     // call to completeUpdateCycle() at the end of the update process.
     m_accessMutex.lock();
@@ -524,6 +589,10 @@ HNDeviceHealth::startUpdateCycle( time_t updateTimestamp )
 bool
 HNDeviceHealth::completeUpdateCycle()
 {
+    // Only allow when enabled
+    if( m_enabled == false )
+        return HNDH_RESULT_SUCCESS;
+
     // Propogate any negative status up the parent chain.
     if( propagateStatus() == true )
     {
@@ -564,6 +633,10 @@ HNDeviceHealth::setComponentStatus( std::string compID, HNDH_CSTAT_T stdStatus )
 {
     HNDHComponent *comp;
 
+    // Only allow when enabled
+    if( m_enabled == false )
+        return;
+
     // Make sure we are in an update cycle.
     if( m_lockedForUpdate ==  false )
     {
@@ -593,6 +666,10 @@ void
 HNDeviceHealth::clearComponentErrMsg( std::string compID )
 {
     HNDHComponent *comp;
+
+    // Only allow when enabled
+    if( m_enabled == false )
+        return;
 
     // Make sure we are in an update cycle.
     if( m_lockedForUpdate ==  false )
@@ -629,6 +706,10 @@ HNDeviceHealth::setComponentErrMsg( std::string compID, uint errCode, uint fmtCo
 {
     HNDHComponent *comp;
     va_list vargs;
+
+    // Only allow when enabled
+    if( m_enabled == false )
+        return;
 
     // Make sure we are in an update cycle.
     if( m_lockedForUpdate ==  false )
@@ -674,6 +755,10 @@ HNDeviceHealth::clearComponentNote( std::string compID )
 {
     HNDHComponent *comp;
 
+    // Only allow when enabled
+    if( m_enabled == false )
+        return;
+
     // Make sure we are in an update cycle.
     if( m_lockedForUpdate ==  false )
     {
@@ -703,6 +788,10 @@ HNDeviceHealth::setComponentNote( std::string compID, uint fmtCode, ... )
 {
     HNDHComponent *comp;
     va_list vargs;
+
+    // Only allow when enabled
+    if( m_enabled == false )
+        return;
 
     // Make sure we are in an update cycle.
     if( m_lockedForUpdate ==  false )
@@ -778,6 +867,13 @@ bool
 HNDeviceHealth::propagateStatus()
 {
     bool changed = false;
+
+    // Only allow when enabled
+    if( m_enabled == false )
+        return HNDH_RESULT_SUCCESS;
+
+    if( m_devStatus == NULL )
+        return changed;
 
     propagateChild( m_devStatus, changed );
 
@@ -863,6 +959,8 @@ HNDeviceHealth::getRestJSON( std::ostream &oStream )
 
     if( m_enabled == true )
     {
+        m_devStatus->debugPrint( 4, m_stringStore, true );
+
         jsRoot.set( "deviceStatus", m_devStatus->getPropagatedStatusAsStr() );
         jsRoot.set( "deviceID", m_deviceID );
         jsRoot.set( "deviceCRC32", m_deviceCRC32 );
@@ -881,15 +979,15 @@ HNDeviceHealth::getRestJSON( std::ostream &oStream )
 
         pjs::Object jsDescInst;
         populateStrInstJSONObject( &jsDescInst, m_devStatus->getDescInstancePtr() );
-        jsCompRoot.set( "descSI", jsNameInst );
+        jsCompRoot.set( "descSI", jsDescInst );
 
         pjs::Object jsMsgInst;
         populateStrInstJSONObject( &jsMsgInst, m_devStatus->getMsgInstancePtr() );
-        jsCompRoot.set( "msgSI", jsNameInst );
+        jsCompRoot.set( "msgSI", jsMsgInst );
 
         pjs::Object jsNoteInst;
         populateStrInstJSONObject( &jsNoteInst, m_devStatus->getNoteInstancePtr() );
-        jsCompRoot.set( "noteSI", jsNameInst );
+        jsCompRoot.set( "noteSI", jsNoteInst );
 
         pjs::Array jsChildList;
         for( std::vector< HNDHComponent* >::iterator it = m_devStatus->getChildListRef().begin(); it != m_devStatus->getChildListRef().end(); it++ )
@@ -938,12 +1036,16 @@ HNDHComponent*
 HNDeviceHealth::allocateNewComponent( std::string compID )
 {
     HNDHComponent *comp = new HNDHComponent( compID );
+
+    std::cout << "allocateNewComponent: " << compID << std::endl;
+
     return comp;
 }
 
 void
 HNDeviceHealth::freeComponent( HNDHComponent *comp )
 {
+    std::cout << "freeComponent: " << comp->getID() << std::endl;
     delete comp;
 }
 
@@ -962,6 +1064,38 @@ HNDeviceHealth::freeComponentTree( HNDHComponent *rootComp )
     freeComponent( rootComp );
 }
 
+void
+HNDeviceHealth::debugPrint()
+{
+    std::cout << "==== Health Store - Health Report - start ====" << std::endl;
+
+    if( m_enabled == true )
+    {
+        std::cout << "enabled: true" << std::endl;
+        std::cout << "deviceID: " << m_deviceID << "  deviceCRC32: " << m_deviceCRC32 << "  deviceName: " << m_deviceName << std::endl;
+
+        if( m_devStatus )
+            m_devStatus->debugPrint( 0, m_stringStore, true );
+    }
+    else
+    {
+        std::cout << "enabled: false" << std::endl;
+    }
+
+
+    std::cout << "==== Health Store - Health Report - end ====" << std::endl;
+}
+
+std::string
+HNDeviceHealth::renderStringInstance( HNFSInstance *strInst )
+{
+    std::string rtnStr;
+
+    if( m_stringStore == NULL )
+        return rtnStr;
+
+    return m_stringStore->renderInstance( strInst );
+}
 
 HNHealthCache::HNHealthCache()
 {
@@ -979,11 +1113,46 @@ HNHealthCache::setFormatStringCache( HNFormatStringCache *strCachePtr )
     m_strCache = strCachePtr;
 }
 
+std::string
+HNHealthCache::getHealthReportAsJSON()
+{
+    return "";
+}
+
+void
+HNHealthCache::debugPrintHealthReport()
+{
+    std::cout << "==== Health Cache - Health Report - start ====" << std::endl;
+
+    std::map< std::string, HNDHComponent* >::iterator it;
+    for( it = m_devHealthTreeMap.begin(); it != m_devHealthTreeMap.end(); it++ )
+    {
+        std::cout << "Device: " << it->first << std::endl;
+
+        it->second->debugPrint( 4, m_strCache, true );
+    }
+
+    std::cout << "==== Health Cache - Health Report - end ====" << std::endl;
+}
+
+std::string
+HNHealthCache::renderStringInstance( HNFSInstance *strInst )
+{
+    std::string rtnStr;
+
+    if( m_strCache == NULL )
+        return rtnStr;
+
+    return m_strCache->renderInstance( strInst );    
+}
+
 HNDH_RESULT_T
 HNHealthCache::updateDeviceHealth( std::string devCRC32ID, std::istream& bodyStream, bool &changed )
 {
     // Start off with no change indication
     changed = false;
+
+    std::set< std::string > origCompIDs;
 
     // {
     //   "deviceCRC32": "535cd1eb",
@@ -1126,6 +1295,11 @@ HNHealthCache::handleHealthComponentStrInstanceUpdate( void *jsSIPtr, HNFSInstan
         if( strInstPtr->getFmtCode() != fmtCode )
         {
             strInstPtr->setFmtCode( fmtCode );
+
+            // Register fmtCode usage with string store cache, in case its a new one.
+            if( m_strCache )
+                m_strCache->reportFormatCode( fmtCode );
+            
             changed = true;
         }
     }
@@ -1243,7 +1417,12 @@ HNHealthCache::handleHealthComponentChildren( void *jsCompPtr, HNDHComponent *ro
 
     // Cast the ptr-ptr back to a POCO JSON Ptr
     pjs::Object::Ptr jsComp = *((pjs::Object::Ptr *) jsCompPtr);
-        
+
+    // Get a list of current component children so that at the end 
+    // we can tell if some children need to be deleted.
+    std::set< std::string > origChildIDs;
+    rootComponent->getChildIDs( origChildIDs );
+
     pjs::Array::Ptr jsChildArr = jsComp->getArray( "children" );        
 
     std::cout << "  comp - child array size: " << jsChildArr->size() << std::endl;
@@ -1287,6 +1466,9 @@ HNHealthCache::handleHealthComponentChildren( void *jsCompPtr, HNDHComponent *ro
         bool compCreated = false;
         HNDHComponent *childComp = rootComponent->getOrCreateChildComponent( compID, compCreated );
 
+        // Indicate that we have visited this component
+        origChildIDs.erase( compID );
+
         // Parse this child's fields
         bool compChange = false;
         handleHealthComponentUpdate( &jsComp, childComp, compChange );
@@ -1295,15 +1477,21 @@ HNHealthCache::handleHealthComponentChildren( void *jsCompPtr, HNDHComponent *ro
         bool childChange = false;
         handleHealthComponentChildren( &jsComp, childComp, childChange );
 
-        changed = compChange | childChange;
+        changed = compCreated | compChange | childChange;
 
     }
 
-    // Check if we have an existing component structure
-    //if( m_deviceHealth == NULL )
-    //{
-    //    m_deviceHealth = new HNDHComponent;
-    //}
+    // Check if any old components need to be deleted at this level
+    if( origChildIDs.size() > 0 )
+    {
+        changed = true;
+
+        for( std::set< std::string >::iterator cit = origChildIDs.begin(); cit != origChildIDs.end(); cit++ )
+        {
+            std::cout << "Deleting old health component: " << *cit << std::endl;
+            rootComponent->deleteChildByID( *cit );
+        }
+    }
 
     return HNDH_RESULT_SUCCESS;
 }

@@ -252,6 +252,16 @@ HNFormatStringStore::fillInstance( uint fmtCode, HNFSInstance *instance, ... )
     return result;
 }
 
+std::string
+HNFormatStringStore::renderInstance( HNFSInstance *instance )
+{
+    std::string rtnStr;
+
+    rtnStr = "FIXME HNFormatStringStore test return string";
+
+    return rtnStr;
+}
+
 HNFormatStringCache::HNFormatStringCache()
 {
 
@@ -260,4 +270,25 @@ HNFormatStringCache::HNFormatStringCache()
 HNFormatStringCache::~HNFormatStringCache()
 {
 
+}
+
+void
+HNFormatStringCache::reportFormatCode( uint fmtCode )
+{
+    std::cout << "HNFormatStringCache::reportFormatCode - code: " << fmtCode << std::endl;
+
+    // Empty string is not valid
+    if( fmtCode == 0 )
+        return;
+
+}
+
+std::string
+HNFormatStringCache::renderInstance( HNFSInstance *instance )
+{
+    std::string rtnStr;
+
+    rtnStr = "FIXME HNFormatStringCache test return string";
+
+    return rtnStr;
 }

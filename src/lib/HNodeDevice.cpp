@@ -731,7 +731,7 @@ HNodeDevice::start()
     // Indicate support for healh information requests
     if( m_health.isEnabled() == true )
     {
-        m_health.init( createAvahiName(), m_hnodeID.getCRC32AsHexStr(), getName() );
+        m_health.updateDeviceInfo( createAvahiName(), m_hnodeID.getCRC32AsHexStr(), getName() );
 
         // Indicate support for healh information requests
         registerProvidedServiceExtension( "hnsrv-health-source", "1.0.0", "device/health" );
