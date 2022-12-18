@@ -376,13 +376,13 @@ HNDHComponent::debugPrint( uint offset, HNRenderStringIntf *renderIntf, bool pri
     std::cout << std::endl;
     std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "id" << ": " << getID() << std::endl;
     std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "name" << ": " << renderIntf->renderInstance( getNameInstancePtr() ) << std::endl;
-    //std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "desc" << ": " << getRenderedDesc() << std::endl;
+    std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "desc" << ": " << renderIntf->renderInstance( getDescInstancePtr() ) << std::endl;
     std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "status" << ": " << getStatusAsStr() << std::endl;
     std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "propagated status" << ": " << getPropagatedStatusAsStr() << std::endl;
     std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "time" << ": " << getLastUpdateTimeAsStr() << std::endl;
-    //std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "note" << ": " << getRenderedNote() << std::endl;
+    std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "note" << ": " << renderIntf->renderInstance( getNoteInstancePtr() ) << std::endl;
     std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "error code" << ": " << getErrorCode() << std::endl;
-    //std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "error msg" << ": " << getRenderedMsg() << std::endl;
+    std::cout << std::setw( offset ) << " " << std::left << std::setw( 20 ) << "error msg" << ": " << renderIntf->renderInstance( getMsgInstancePtr() ) << std::endl;
 
     if( printChildren == false )
         return;
@@ -495,8 +495,6 @@ HNDeviceHealth::allocUniqueID( std::string &compID )
 HNDH_RESULT_T
 HNDeviceHealth::updateDeviceInfo( std::string deviceID, std::string deviceCRC32, std::string deviceName )
 {
-    std::cout << "HNDeviceHealth::init" << std::endl;
-
     // Grab the scope lock
     const std::lock_guard< std::mutex > lock( m_accessMutex );
 
@@ -557,8 +555,6 @@ HNDeviceHealth::registerComponent( std::string componentName, std::string parent
     m_compStatus.insert( std::pair<std::string, HNDHComponent*>( compID, newComp ) );
 
     parent->addChildComponent( newComp );
-
-    m_devStatus->debugPrint( 4, m_stringStore, true );
 
     return HNDH_RESULT_SUCCESS;
 }
@@ -959,8 +955,6 @@ HNDeviceHealth::getRestJSON( std::ostream &oStream )
 
     if( m_enabled == true )
     {
-        m_devStatus->debugPrint( 4, m_stringStore, true );
-
         jsRoot.set( "deviceStatus", m_devStatus->getPropagatedStatusAsStr() );
         jsRoot.set( "deviceID", m_deviceID );
         jsRoot.set( "deviceCRC32", m_deviceCRC32 );
@@ -1037,7 +1031,7 @@ HNDeviceHealth::allocateNewComponent( std::string compID )
 {
     HNDHComponent *comp = new HNDHComponent( compID );
 
-    std::cout << "allocateNewComponent: " << compID << std::endl;
+    // std::cout << "allocateNewComponent: " << compID << std::endl;
 
     return comp;
 }
@@ -1045,7 +1039,7 @@ HNDeviceHealth::allocateNewComponent( std::string compID )
 void
 HNDeviceHealth::freeComponent( HNDHComponent *comp )
 {
-    std::cout << "freeComponent: " << comp->getID() << std::endl;
+    // std::cout << "freeComponent: " << comp->getID() << std::endl;
     delete comp;
 }
 
@@ -1149,9 +1143,6 @@ HNHealthCache::renderStringInstance( HNFSInstance *strInst )
 HNDH_RESULT_T
 HNHealthCache::updateDeviceHealth( std::string devCRC32ID, std::istream& bodyStream, bool &changed )
 {
-    // Start off with no change indication
-    changed = false;
-
     std::set< std::string > origCompIDs;
 
     // {
@@ -1172,8 +1163,6 @@ HNHealthCache::updateDeviceHealth( std::string devCRC32ID, std::istream& bodyStr
     //     "updateTime": "Thu Nov 24 13:03:10 2022\n"
     //   }
     // }
-
-    std::cout << "updateDeviceHealth - entry" << std::endl;
 
     // Parse the json body of the request
     try
@@ -1226,7 +1215,7 @@ HNHealthCache::updateDeviceHealth( std::string devCRC32ID, std::istream& bodyStr
 
         std::string compID = jsRootComp->getValue<std::string>( "id" );
 
-        std::cout << "compID: " << compID << "  devCRC32ID: " << devCRC32ID << std::endl;
+        // std::cout << "compID: " << compID << "  devCRC32ID: " << devCRC32ID << std::endl;
 
         // See if there is already a record for this device in the cache
         std::map< std::string, HNDHComponent* >::iterator dit = m_devHealthTreeMap.find( devCRC32ID );
@@ -1247,7 +1236,7 @@ HNHealthCache::updateDeviceHealth( std::string devCRC32ID, std::istream& bodyStr
             // Free the existing component tree
             HNDeviceHealth::freeComponentTree( dit->second );
 
-            m_devHealthTreeMap.erase( dit );
+            m_devHealthTreeMap.clear();
 
             // Start a new tree with the proper root component
             HNDHComponent *newComp = HNDeviceHealth::allocateNewComponent( compID );
@@ -1280,18 +1269,13 @@ HNHealthCache::updateDeviceHealth( std::string devCRC32ID, std::istream& bodyStr
 HNDH_RESULT_T
 HNHealthCache::handleHealthComponentStrInstanceUpdate( void *jsSIPtr, HNFSInstance *strInstPtr, bool &changed )
 {
-    // Start off with no change indication
-    changed = false;
-
-    std::cout << "handleHealthComponentStrInstanceUpdate - entry" << std::endl;
-
     // Cast the ptr-ptr back to a POCO JSON Ptr
     pjs::Object::Ptr jsSI = *((pjs::Object::Ptr *) jsSIPtr);
 
     if( jsSI->has( "fmtCode" ) )
     {
         uint fmtCode = jsSI->getValue<uint>( "fmtCode" );
-        std::cout << "      format code: " << fmtCode << std::endl;
+        // std::cout << "      format code: " << fmtCode << std::endl;
         if( strInstPtr->getFmtCode() != fmtCode )
         {
             strInstPtr->setFmtCode( fmtCode );
@@ -1310,18 +1294,13 @@ HNHealthCache::handleHealthComponentStrInstanceUpdate( void *jsSIPtr, HNFSInstan
 HNDH_RESULT_T
 HNHealthCache::handleHealthComponentUpdate( void *jsCompPtr, HNDHComponent *compPtr, bool &changed )
 {
-    // Start off with no change indication
-    changed = false;
-
-    std::cout << "handleHealthComponentUpdate - entry" << std::endl;    
-
     // Cast the ptr-ptr back to a POCO JSON Ptr
     pjs::Object::Ptr jsComp = *((pjs::Object::Ptr *) jsCompPtr);
 
     if( jsComp->has( "setStatus" ) )
     {
         std::string sStat = jsComp->getValue<std::string>( "setStatus" );
-        std::cout << "  comp - status: " << sStat << std::endl;
+        // std::cout << "  comp - status: " << sStat << std::endl;
         if( compPtr->getStatusAsStr() != sStat )
         {
             compPtr->setStatusFromStr( sStat );
@@ -1332,7 +1311,7 @@ HNHealthCache::handleHealthComponentUpdate( void *jsCompPtr, HNDHComponent *comp
     if( jsComp->has( "propagatedStatus" ) )
     {
         std::string pStat = jsComp->getValue<std::string>( "propagatedStatus" );
-        std::cout << "  comp - propagated: " << pStat << std::endl;
+        // std::cout << "  comp - propagated: " << pStat << std::endl;
         if( compPtr->getPropagatedStatusAsStr() != pStat )
         {
             compPtr->setPropagatedStatusFromStr( pStat );
@@ -1353,7 +1332,7 @@ HNHealthCache::handleHealthComponentUpdate( void *jsCompPtr, HNDHComponent *comp
     if( jsComp->has( "errCode" ) )
     {
         uint eCode = jsComp->getValue<uint>( "errCode" );
-        std::cout << "  comp - errCode: " << eCode << std::endl;
+        // std::cout << "  comp - errCode: " << eCode << std::endl;
         if( compPtr->getErrorCode() != eCode )
         {
             compPtr->setErrorCode( eCode );
@@ -1367,8 +1346,11 @@ HNHealthCache::handleHealthComponentUpdate( void *jsCompPtr, HNDHComponent *comp
         HNFSInstance *strInstPtr = compPtr->getNameInstancePtr();
 
         pjs::Object::Ptr jsSI = jsComp->getObject( "nameSI" );
-        std::cout << "    parse name string instance" << std::endl;
+        // std::cout << "    parse name string instance" << std::endl;
         handleHealthComponentStrInstanceUpdate( &jsSI, strInstPtr, siChanged );
+
+        if( siChanged == true )
+            changed = true;
     }
 
     if( jsComp->isObject( "descSI" ) )
@@ -1377,9 +1359,12 @@ HNHealthCache::handleHealthComponentUpdate( void *jsCompPtr, HNDHComponent *comp
         HNFSInstance *strInstPtr = compPtr->getDescInstancePtr();
 
         pjs::Object::Ptr jsSI = jsComp->getObject( "descSI" );
-        std::cout << "    parse desc string instance" << std::endl;
+        // std::cout << "    parse desc string instance" << std::endl;
 
         handleHealthComponentStrInstanceUpdate( &jsSI, strInstPtr, siChanged );
+
+        if( siChanged == true )
+            changed = true;
     }
 
     if( jsComp->isObject( "noteSI" ) )
@@ -1388,9 +1373,12 @@ HNHealthCache::handleHealthComponentUpdate( void *jsCompPtr, HNDHComponent *comp
         HNFSInstance *strInstPtr = compPtr->getNoteInstancePtr();
 
         pjs::Object::Ptr jsSI = jsComp->getObject( "noteSI" );
-        std::cout << "    parse note string instance" << std::endl;
+        // std::cout << "    parse note string instance" << std::endl;
 
         handleHealthComponentStrInstanceUpdate( &jsSI, strInstPtr, siChanged );
+
+        if( siChanged == true )
+            changed = true;
     }
 
     if( jsComp->isObject( "msgSI" ) )
@@ -1399,9 +1387,12 @@ HNHealthCache::handleHealthComponentUpdate( void *jsCompPtr, HNDHComponent *comp
         HNFSInstance *strInstPtr = compPtr->getMsgInstancePtr();
 
         pjs::Object::Ptr jsSI = jsComp->getObject( "msgSI" );
-        std::cout << "    parse msg string instance" << std::endl;
+        // std::cout << "    parse msg string instance" << std::endl;
 
         handleHealthComponentStrInstanceUpdate( &jsSI, strInstPtr, siChanged );
+
+        if( siChanged == true )
+            changed = true;
     }
 
     return HNDH_RESULT_SUCCESS;
@@ -1410,11 +1401,6 @@ HNHealthCache::handleHealthComponentUpdate( void *jsCompPtr, HNDHComponent *comp
 HNDH_RESULT_T
 HNHealthCache::handleHealthComponentChildren( void *jsCompPtr, HNDHComponent *rootComponent, bool &changed )
 {
-    // Start with no change indication
-    changed = false;
-
-    std::cout << "handleHealthComponentChildren - entry" << std::endl;
-
     // Cast the ptr-ptr back to a POCO JSON Ptr
     pjs::Object::Ptr jsComp = *((pjs::Object::Ptr *) jsCompPtr);
 
@@ -1425,7 +1411,7 @@ HNHealthCache::handleHealthComponentChildren( void *jsCompPtr, HNDHComponent *ro
 
     pjs::Array::Ptr jsChildArr = jsComp->getArray( "children" );        
 
-    std::cout << "  comp - child array size: " << jsChildArr->size() << std::endl;
+    // std::cout << "  comp - child array size: " << jsChildArr->size() << std::endl;
 
     // If the component array doesn't have elements, then exit
     if( jsChildArr->size() == 0 )
@@ -1436,7 +1422,7 @@ HNHealthCache::handleHealthComponentChildren( void *jsCompPtr, HNDHComponent *ro
     // Enumerate through the components in the array
     for( uint i = 0; i < jsChildArr->size(); i++ )
     {
-        std::cout << "    child - index: " << i << std::endl;
+        // std::cout << "    child - index: " << i << std::endl;
 
         // {
         //   "children": [],
@@ -1451,16 +1437,16 @@ HNHealthCache::handleHealthComponentChildren( void *jsCompPtr, HNDHComponent *ro
         // },
         pjs::Object::Ptr jsComp = jsChildArr->getObject( i );
 
-        std::cout << "===" << std::endl;
-        jsComp->stringify(std::cout, 1);
-        std::cout << "===" << std::endl;
+        // std::cout << "===" << std::endl;
+        // jsComp->stringify(std::cout, 1);
+        // std::cout << "===" << std::endl;
 
         // Extract component id and name fields
         if( jsComp->has("id") == false )
             continue;
         std::string compID = jsComp->getValue<std::string>( "id" );
 
-        std::cout << "    child " << i << " - id: " << compID << std::endl;
+        // std::cout << "    child " << i << " - id: " << compID << std::endl;
 
         // Match with an existing HNDHComponent or create a new one.
         bool compCreated = false;
