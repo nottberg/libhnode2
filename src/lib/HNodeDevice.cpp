@@ -644,7 +644,7 @@ HNodeDevice::isServiceMapped( std::string typeStr )
 HND_RESULT_T
 HNodeDevice::registerFormatString( std::string formatStr, uint &code )
 {
-    if( m_stringStore.registerFormatString( formatStr, code ) != HNFS_RESULT_SUCCESS )
+    if( m_stringStore.registerFormatString( getHNodeIDCRC32(), formatStr, code ) != HNFS_RESULT_SUCCESS )
       return HND_RESULT_FAILURE;
 
     return HND_RESULT_SUCCESS;
@@ -653,7 +653,7 @@ HNodeDevice::registerFormatString( std::string formatStr, uint &code )
 HND_RESULT_T
 HNodeDevice::enableHealthMonitoring()
 {
-    m_health.setEnabled();
+    m_health.setEnabled( getHNodeIDCRC32() );
 
     return HND_RESULT_SUCCESS;
 }
@@ -728,10 +728,14 @@ HNodeDevice::start()
 
     std::cout << "Started HNAvahi..." << std::endl;
 
+    // Indicate support for string service requests
+    m_stringStore.setEnabled( getHNodeIDCRC32() );
+    registerProvidedServiceExtension( "hnsrv-string-source", "1.0.0", "device/string-source" );
+
     // Indicate support for healh information requests
     if( m_health.isEnabled() == true )
     {
-        m_health.updateDeviceInfo( createAvahiName(), m_hnodeID.getCRC32AsHexStr(), getName() );
+        m_health.updateDeviceInfo( createAvahiName(), getName() );
 
         // Indicate support for healh information requests
         registerProvidedServiceExtension( "hnsrv-health-source", "1.0.0", "device/health" );
@@ -1324,7 +1328,44 @@ HNodeDevice::dispatchEP( HNodeDevice *parent, HNOperationData *opData )
         opData->responseSetStatusAndReason( HNR_HTTP_NOT_IMPLEMENTED );
         opData->responseSend();
         return;
-    }    
+    }
+    else if( "getAllDeviceFormatStrings" == opID )
+    {
+        HNFS_RESULT_T result;
+
+        opData->responseSetChunkedTransferEncoding(true);
+        opData->responseSetContentType("application/json");
+
+        // Render the response
+        std::ostream& ostr = opData->responseSend();
+        result = m_stringStore.getAllFormatStringsJSON( ostr );
+
+        if( result != HNFS_RESULT_SUCCESS )
+        {
+            opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
+            opData->responseSend();
+            return;
+        }
+    }
+    else if( "getDeviceFormatStrings" == opID )
+    {
+        HNFS_RESULT_T result;
+
+        opData->responseSetChunkedTransferEncoding(true);
+        opData->responseSetContentType("application/json");
+
+        // Render the response
+        std::istream& rstr = opData->requestBody();
+        std::ostream& ostr = opData->responseSend();
+        result = m_stringStore.getSelectFormatStringsJSON( rstr, ostr );
+
+        if( result != HNFS_RESULT_SUCCESS )
+        {
+            opData->responseSetStatusAndReason( HNR_HTTP_INTERNAL_SERVER_ERROR );
+            opData->responseSend();
+            return;
+        }
+    }
     else
     {
         // Send back not implemented
@@ -1642,6 +1683,48 @@ const std::string g_HNode2DeviceRest = R"(
       "get": {
         "summary": "Get health monitoring status for a single component.",
         "operationId": "getDeviceHealthComponent",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      }
+    },
+
+    "/hnode2/device/string-source/format-strings": {
+      "get": {
+        "summary": "Get the format strings that have been registered by the device.",
+        "operationId": "getAllDeviceFormatStrings",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        }
+      },
+
+      "put": {
+        "summary": "Request a specific subset of device format strings.",
+        "operationId": "getDeviceFormatStrings",
         "responses": {
           "200": {
             "description": "successful operation",

@@ -330,7 +330,7 @@ class HNode2TestApp : public Poco::Util::Application
                 HNFormatStringStore  strStore;
 
                 uint msgcode = 0;
-                HNFS_RESULT_T result = strStore.registerFormatString( "Format Test string: %d, with %s, and 0x%2x, finally %1.2f", msgcode );
+                HNFS_RESULT_T result = strStore.registerFormatString( 0x10101010, "Format Test string: %d, with %s, and 0x%2x, finally %1.2f", msgcode );
 
                 std::cout << "registerFormatString result: " << result << " with message code: " << msgcode << std::endl;
 
@@ -352,17 +352,17 @@ class HNode2TestApp : public Poco::Util::Application
                 uint warncode = 0;
                 uint troublecode = 0;
                 uint failedcode = 0;
-                HNFS_RESULT_T result = strStore.registerFormatString( "Warning: %d", warncode );
+                HNFS_RESULT_T result = strStore.registerFormatString( 0xbc453423, "Warning: %d", warncode );
                 std::cout << "registerFormatString result: " << result << " with message code: " << warncode << std::endl;
 
-                result = strStore.registerFormatString( "Trouble: %s", troublecode );
+                result = strStore.registerFormatString( 0xbc453423, "Trouble: %s", troublecode );
                 std::cout << "registerFormatString result: " << result << " with message code: " << troublecode << std::endl;
 
-                result = strStore.registerFormatString( "Failure: %f", failedcode );
+                result = strStore.registerFormatString( 0xbc453423, "Failure: %f", failedcode );
                 std::cout << "registerFormatString result: " << result << " with message code: " << failedcode << std::endl;
 
                 // Setup component structure
-                deviceHealth.updateDeviceInfo( "hnode-test-util-bc453423-name", "bc453423", "Irrigation Device" );
+                deviceHealth.updateDeviceInfo( "hnode-test-util-bc453423-name", "Irrigation Device" );
 
                 std::string comp1ID;
                 deviceHealth.registerComponent( "comp 1", HNDH_ROOT_COMPID, comp1ID );

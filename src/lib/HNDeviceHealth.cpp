@@ -8,6 +8,7 @@
 #include <Poco/JSON/Parser.h>
 #include <Poco/Checksum.h>
 
+#include "HNodeID.h"
 #include "HNDeviceHealth.h"
 
 namespace pjs = Poco::JSON;
@@ -419,11 +420,13 @@ HNDeviceHealth::~HNDeviceHealth()
 }
 
 void 
-HNDeviceHealth::setEnabled()
+HNDeviceHealth::setEnabled( uint32_t devCRC32ID )
 {
     if( m_enabled == false )
     {
         m_enabled = true;
+
+        m_deviceCRC32ID = devCRC32ID;
 
         // Grab the scope lock
         const std::lock_guard< std::mutex > lock( m_accessMutex );
@@ -432,7 +435,7 @@ HNDeviceHealth::setEnabled()
         m_devStatus->setStatus( HNDH_CSTAT_UNKNOWN );
 
         uint NameSID;
-        m_stringStore->registerFormatString( m_deviceName, NameSID );
+        m_stringStore->registerFormatString( devCRC32ID, m_deviceName, NameSID );
         m_devStatus->getNameInstancePtr()->setFmtCode( NameSID );
 
         m_compStatus.insert( std::pair< std::string, HNDHComponent* >( m_devStatus->getID(), m_devStatus ) );
@@ -493,13 +496,12 @@ HNDeviceHealth::allocUniqueID( std::string &compID )
 }
 
 HNDH_RESULT_T
-HNDeviceHealth::updateDeviceInfo( std::string deviceID, std::string deviceCRC32, std::string deviceName )
+HNDeviceHealth::updateDeviceInfo( std::string deviceID, std::string deviceName )
 {
     // Grab the scope lock
     const std::lock_guard< std::mutex > lock( m_accessMutex );
 
     m_deviceID    = deviceID;
-    m_deviceCRC32 = deviceCRC32;
     m_deviceName  = deviceName;
 
     // Only allow when enabled
@@ -507,7 +509,7 @@ HNDeviceHealth::updateDeviceInfo( std::string deviceID, std::string deviceCRC32,
         return HNDH_RESULT_SUCCESS;
 
     uint NameSID;
-    m_stringStore->registerFormatString( m_deviceName, NameSID );
+    m_stringStore->registerFormatString( m_deviceCRC32ID,  m_deviceName, NameSID );
     m_devStatus->getNameInstancePtr()->setFmtCode( NameSID );
 
     return HNDH_RESULT_SUCCESS;
@@ -547,7 +549,7 @@ HNDeviceHealth::registerComponent( std::string componentName, std::string parent
     HNDHComponent *newComp = HNDeviceHealth::allocateNewComponent( compID );
 
     uint NameSID;
-    m_stringStore->registerFormatString( componentName, NameSID );
+    m_stringStore->registerFormatString( m_deviceCRC32ID, componentName, NameSID );
     newComp->getNameInstancePtr()->setFmtCode( NameSID );
 
     newComp->setParentID( parent->getID() );
@@ -603,7 +605,7 @@ HNDeviceHealth::completeUpdateCycle()
     {
         pjs::Object jsRoot;
 
-        jsRoot.set( "devID", m_deviceCRC32 );
+        jsRoot.set( "devID", HNodeID::convertCRC32ToStr( m_deviceCRC32ID ) );
         jsRoot.set( "devStatus", m_devStatus->getPropagatedStatusAsStr() );
 
         std::stringstream payload;
@@ -957,7 +959,7 @@ HNDeviceHealth::getRestJSON( std::ostream &oStream )
     {
         jsRoot.set( "deviceStatus", m_devStatus->getPropagatedStatusAsStr() );
         jsRoot.set( "deviceID", m_deviceID );
-        jsRoot.set( "deviceCRC32", m_deviceCRC32 );
+        jsRoot.set( "deviceCRC32", HNodeID::convertCRC32ToStr( m_deviceCRC32ID ) );
 
         pjs::Object jsCompRoot;
 
@@ -1066,7 +1068,7 @@ HNDeviceHealth::debugPrint()
     if( m_enabled == true )
     {
         std::cout << "enabled: true" << std::endl;
-        std::cout << "deviceID: " << m_deviceID << "  deviceCRC32: " << m_deviceCRC32 << "  deviceName: " << m_deviceName << std::endl;
+        std::cout << "deviceID: " << m_deviceID << "  deviceCRC32: " << HNodeID::convertCRC32ToStr( m_deviceCRC32ID ) << "  deviceName: " << m_deviceName << std::endl;
 
         if( m_devStatus )
             m_devStatus->debugPrint( 0, m_stringStore, true );
@@ -1282,7 +1284,7 @@ HNHealthCache::handleHealthComponentStrInstanceUpdate( void *jsSIPtr, HNFSInstan
 
             // Register fmtCode usage with string store cache, in case its a new one.
             if( m_strCache )
-                m_strCache->reportFormatCode( fmtCode );
+                m_strCache->reportFormatCode( strInstPtr->getDevCRC32ID(), fmtCode );
             
             changed = true;
         }

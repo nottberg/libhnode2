@@ -134,13 +134,13 @@ class HNDeviceHealth
         HNDeviceHealth( HNFormatStringStore *stringStore, HNHttpEventClient *evClient );
        ~HNDeviceHealth();
 
-        void setEnabled();
+        void setEnabled( uint32_t devCRC32ID );
         bool isEnabled();
 
         void clear();
 
         // Initialize the root component
-        HNDH_RESULT_T updateDeviceInfo( std::string deviceID, std::string deviceCRC32, std::string deviceName );
+        HNDH_RESULT_T updateDeviceInfo( std::string deviceID, std::string deviceName );
 
         // Register a component that has monitored health status.
         HNDH_RESULT_T registerComponent( std::string componentName, std::string parentID, std::string &compID );
@@ -194,7 +194,7 @@ class HNDeviceHealth
 
         // The device ID
         std::string m_deviceID;
-        std::string m_deviceCRC32;
+        uint32_t m_deviceCRC32ID;
         std::string m_deviceName;
 
         // Root of health status tree 

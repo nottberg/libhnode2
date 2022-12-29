@@ -32,6 +32,8 @@ class HNodeID
 
         uint32_t getCRC32();
         std::string getCRC32AsHexStr();
+
+        static std::string convertCRC32ToStr( uint32_t value );
 };
 
 #endif // __HNODE_ID_H__

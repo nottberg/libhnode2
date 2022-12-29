@@ -181,4 +181,14 @@ HNodeID::getCRC32AsHexStr()
     return result;
 }
 
+std::string
+HNodeID::convertCRC32ToStr( uint32_t value )
+{
+    std::string result;
+    char buf[16];
 
+    sprintf( buf, "%8.8x", value );
+    result = buf;
+
+    return result;
+}
