@@ -403,6 +403,103 @@ HNFormatStringStore::getAllFormatStringsJSON( std::ostream& ostr )
 HNFS_RESULT_T
 HNFormatStringStore::getSelectFormatStringsJSON( std::istream& istr, std::ostream& ostr )
 {
+    std::vector< uint32_t > refFmtCodeArray;
+
+    // Grab the scope lock
+    const std::lock_guard< std::mutex > lock( m_updateMutex );
+
+    // Parse the json body of the request
+    try
+    {
+        // Attempt to parse the json    
+        pjs::Parser parser;
+        pdy::Var varRoot = parser.parse( istr );
+
+        // Get a pointer to the root object
+        pjs::Object::Ptr jsRoot = varRoot.extract< pjs::Object::Ptr >();
+
+        if( jsRoot->has( "strRefs" ) )
+        {
+            pjs::Array::Ptr jsRefsArr = jsRoot->getArray( "strRefs" );        
+
+            std::cout << "=== HAS strRefs array - size: " << jsRefsArr->size() << " ===" << std::endl;
+
+            // If the component array doesn't have elements, then exit
+            if( jsRefsArr->size() == 0 )
+            {
+                return HNFS_RESULT_SUCCESS;
+            }
+
+            // Enumerate through the components in the array
+            for( uint i = 0; i < jsRefsArr->size(); i++ )
+            {
+                std::cout << "    child - index: " << i << std::endl;
+
+                pjs::Object::Ptr jsRef = jsRefsArr->getObject( i );
+
+                // std::cout << "===" << std::endl;
+                // jsComp->stringify(std::cout, 1);
+                // std::cout << "===" << std::endl;
+
+                // Extract fmtCode field
+                if( jsRef->has("fmtCode") == false )
+                    continue;
+                uint32_t fmtCode = jsRef->getValue<uint32_t>( "fmtCode" );
+
+                std::cout << "    child " << i << " - fmtCode: " << fmtCode << std::endl;
+
+                refFmtCodeArray.push_back( fmtCode );
+            }
+        }
+    }
+    catch( Poco::Exception ex )
+    {
+        std::cout << "HNFormatStringStore::getSelectFormatStringsJSON - request parse error: " << ex.displayText() << std::endl;
+        return HNFS_RESULT_FAILURE; 
+    }
+
+
+    // Create a json root object
+    pjs::Object jsRsp;
+    
+    jsRsp.set( "enabled", m_enabled );
+
+    if( m_enabled == true )
+    {
+        pjs::Array jsStrArray;
+
+        jsRsp.set( "deviceCRC32", HNodeID::convertCRC32ToStr( m_deviceCRC32ID ) );
+
+        for( std::vector< uint32_t >::iterator fcit = refFmtCodeArray.begin(); fcit != refFmtCodeArray.end(); fcit++ )
+        {
+            pjs::Object jsStrObj;
+
+            std::map< uint, HNFormatString* >::iterator it = m_formatStrs.find( *fcit );
+
+            if( it == m_formatStrs.end() )
+                continue;
+
+            jsStrObj.set( "fmtCode", it->second->getCode() );
+            jsStrObj.set( "fmtString", it->second->getFormatStr() );
+            jsStrObj.set( "templateString", it->second->getTemplateStr() );
+
+            jsStrArray.add( jsStrObj );
+        }
+
+        jsRsp.set( "strDefs", jsStrArray );
+    }
+
+    // Render the response
+    try
+    {
+        // Write out the generated json
+        pjs::Stringifier::stringify( jsRsp, ostr, 1 );
+    }
+    catch( ... )
+    {
+        return HNFS_RESULT_FAILURE;
+    }
+
     return HNFS_RESULT_SUCCESS;
 }
 
