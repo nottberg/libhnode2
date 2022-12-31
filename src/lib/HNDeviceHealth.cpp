@@ -27,14 +27,20 @@ HNDHFormatStr::~HNDHFormatStr()
 }
 */
 
-HNDHComponent::HNDHComponent( std::string compID )
+HNDHComponent::HNDHComponent( uint32_t devCRC32ID, std::string compID )
 {
+    m_devCRC32ID = devCRC32ID;
     m_compID = compID;
 
     m_stdStatus = HNDH_CSTAT_UNKNOWN;
     m_propagatedStatus = HNDH_CSTAT_UNKNOWN;
 
     m_errCode  = 0;
+
+    m_nameInstance.setDevCRC32ID( devCRC32ID );
+    m_descInstance.setDevCRC32ID( devCRC32ID );
+    m_noteInstance.setDevCRC32ID( devCRC32ID );
+    m_msgInstance.setDevCRC32ID( devCRC32ID );
 }
 
 HNDHComponent::~HNDHComponent()
@@ -324,7 +330,7 @@ HNDHComponent::getOrCreateChildComponent( std::string compID, bool &childCreated
 
     childCreated = true;
 
-    rtnComp = HNDeviceHealth::allocateNewComponent( compID );
+    rtnComp = HNDeviceHealth::allocateNewComponent( m_devCRC32ID, compID );
 
     rtnComp->setParentID( getID() );
 
@@ -431,7 +437,7 @@ HNDeviceHealth::setEnabled( uint32_t devCRC32ID )
         // Grab the scope lock
         const std::lock_guard< std::mutex > lock( m_accessMutex );
 
-        m_devStatus = HNDeviceHealth::allocateNewComponent( HNDH_ROOT_COMPID );
+        m_devStatus = HNDeviceHealth::allocateNewComponent( devCRC32ID, HNDH_ROOT_COMPID );
         m_devStatus->setStatus( HNDH_CSTAT_UNKNOWN );
 
         uint NameSID;
@@ -546,7 +552,7 @@ HNDeviceHealth::registerComponent( std::string componentName, std::string parent
     if( allocUniqueID( compID ) != HNDH_RESULT_SUCCESS )
         return HNDH_RESULT_FAILURE;
 
-    HNDHComponent *newComp = HNDeviceHealth::allocateNewComponent( compID );
+    HNDHComponent *newComp = HNDeviceHealth::allocateNewComponent( m_deviceCRC32ID, compID );
 
     uint NameSID;
     m_stringStore->registerFormatString( m_deviceCRC32ID, componentName, NameSID );
@@ -1029,9 +1035,9 @@ HNDeviceHealth::getSinkMapping()
 }
 
 HNDHComponent*
-HNDeviceHealth::allocateNewComponent( std::string compID )
+HNDeviceHealth::allocateNewComponent( uint32_t devCRC32ID, std::string compID )
 {
-    HNDHComponent *comp = new HNDHComponent( compID );
+    HNDHComponent *comp = new HNDHComponent( devCRC32ID, compID );
 
     // std::cout << "allocateNewComponent: " << compID << std::endl;
 
@@ -1120,10 +1126,10 @@ HNHealthCache::debugPrintHealthReport()
 {
     std::cout << "==== Health Cache - Health Report - start ====" << std::endl;
 
-    std::map< std::string, HNDHComponent* >::iterator it;
+    std::map< uint32_t, HNDHComponent* >::iterator it;
     for( it = m_devHealthTreeMap.begin(); it != m_devHealthTreeMap.end(); it++ )
     {
-        std::cout << "Device: " << it->first << std::endl;
+        std::cout << "Device: " << HNodeID::convertCRC32ToStr( it->first ) << std::endl;
 
         it->second->debugPrint( 4, m_strCache, true );
     }
@@ -1143,7 +1149,7 @@ HNHealthCache::renderStringInstance( HNFSInstance *strInst )
 }
 
 HNDH_RESULT_T
-HNHealthCache::updateDeviceHealth( std::string devCRC32ID, std::istream& bodyStream, bool &changed )
+HNHealthCache::updateDeviceHealth( uint32_t devCRC32ID, std::istream& bodyStream, bool &changed )
 {
     std::set< std::string > origCompIDs;
 
@@ -1195,7 +1201,7 @@ HNHealthCache::updateDeviceHealth( std::string devCRC32ID, std::istream& bodyStr
         }
         
         std::string jsDevCRC32ID = jsRoot->getValue<std::string>( "deviceCRC32" );
-        if( jsDevCRC32ID != devCRC32ID )
+        if( jsDevCRC32ID != HNodeID::convertCRC32ToStr( devCRC32ID ) )
         {   
             return HNDH_RESULT_FAILURE;            
         }
@@ -1220,14 +1226,14 @@ HNHealthCache::updateDeviceHealth( std::string devCRC32ID, std::istream& bodyStr
         // std::cout << "compID: " << compID << "  devCRC32ID: " << devCRC32ID << std::endl;
 
         // See if there is already a record for this device in the cache
-        std::map< std::string, HNDHComponent* >::iterator dit = m_devHealthTreeMap.find( devCRC32ID );
+        std::map< uint32_t, HNDHComponent* >::iterator dit = m_devHealthTreeMap.find( devCRC32ID );
 
         if( dit == m_devHealthTreeMap.end() )
         {
             // No existing record for the device, so allocate a new one
-            HNDHComponent *newComp = HNDeviceHealth::allocateNewComponent( compID );
+            HNDHComponent *newComp = HNDeviceHealth::allocateNewComponent( devCRC32ID, compID );
 
-            m_devHealthTreeMap.insert( std::pair< std::string, HNDHComponent* >( devCRC32ID, newComp ) );
+            m_devHealthTreeMap.insert( std::pair< uint32_t, HNDHComponent* >( devCRC32ID, newComp ) );
 
             dit = m_devHealthTreeMap.find( devCRC32ID );
 
@@ -1241,9 +1247,9 @@ HNHealthCache::updateDeviceHealth( std::string devCRC32ID, std::istream& bodyStr
             m_devHealthTreeMap.clear();
 
             // Start a new tree with the proper root component
-            HNDHComponent *newComp = HNDeviceHealth::allocateNewComponent( compID );
+            HNDHComponent *newComp = HNDeviceHealth::allocateNewComponent( devCRC32ID, compID );
 
-            m_devHealthTreeMap.insert( std::pair< std::string, HNDHComponent* >( devCRC32ID, newComp ) );
+            m_devHealthTreeMap.insert( std::pair< uint32_t, HNDHComponent* >( devCRC32ID, newComp ) );
 
             dit = m_devHealthTreeMap.find( devCRC32ID );
 

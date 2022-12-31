@@ -40,7 +40,7 @@ typedef enum HNDHComponentStandardStatusEnum {
 class HNDHComponent
 {
     public:
-        HNDHComponent( std::string compID );
+        HNDHComponent( uint32_t devCRC32ID, std::string compID );
        ~HNDHComponent(); 
 
         void clear();
@@ -108,6 +108,8 @@ class HNDHComponent
         void debugPrint( uint offset, HNRenderStringIntf *renderIntf, bool printChildren );
 
     private:
+        uint32_t    m_devCRC32ID;
+        
         std::string m_compID;
 
         HNDH_CSTAT_T m_stdStatus;
@@ -169,7 +171,7 @@ class HNDeviceHealth
         void checkSinkMapping( std::string uri );
         std::string getSinkMapping();
 
-        static HNDHComponent* allocateNewComponent( std::string compID );
+        static HNDHComponent* allocateNewComponent( uint32_t devCRC32ID, std::string compID );
         static void freeComponent( HNDHComponent *rootComp );
         static void freeComponentTree( HNDHComponent *rootComp );
 
@@ -232,7 +234,7 @@ class HNHealthCache
 
         void setFormatStringCache( HNFormatStringCache *strCachePtr );
 
-        HNDH_RESULT_T updateDeviceHealth( std::string devCRC32ID, std::istream& bodyStream, bool &changed );
+        HNDH_RESULT_T updateDeviceHealth( uint32_t devCRC32ID, std::istream& bodyStream, bool &changed );
 
         std::string getHealthReportAsJSON();
 
@@ -244,7 +246,7 @@ class HNHealthCache
 
         HNFormatStringCache *m_strCache;
 
-        std::map< std::string, HNDHComponent* > m_devHealthTreeMap;
+        std::map< uint32_t, HNDHComponent* > m_devHealthTreeMap;
 
         HNDH_RESULT_T handleHealthComponentStrInstanceUpdate( void *jsSIPtr, HNFSInstance *strInstPtr, bool &changed );
         HNDH_RESULT_T handleHealthComponentUpdate( void *jsCompPtr, HNDHComponent *compPtr, bool &changed );

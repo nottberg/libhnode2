@@ -53,17 +53,22 @@ class HNFormatString
 {
     public:
         HNFormatString( uint32_t srcDeviceCRC32ID, std::string formatStr );
+        HNFormatString( uint32_t srcDeviceCRC32ID );
        ~HNFormatString();
 
         uint32_t getDevCRC32ID();
-        uint getCode();
-
-        void setDevCRC32ID( uint32_t value );
-
-        HNFS_RESULT_T validateFormat();
+        uint32_t getCode();
 
         std::string getFormatStr();
         std::string getTemplateStr();
+
+        void setDevCRC32ID( uint32_t value );
+        void setCode( uint32_t value );
+
+        void setFormatStr( std::string value );
+        void setTemplateStr( std::string value );
+
+        HNFS_RESULT_T validateFormat();
 
         HNFS_RESULT_T applyParameters( va_list vargs, HNFSInstance *instance );
 
@@ -105,6 +110,7 @@ class HNFormatStringStore : public HNRenderStringIntf
         HNFS_RESULT_T getSelectFormatStringsJSON( std::istream& istr, std::ostream& ostr );
 
         static HNFormatString* allocateFormatString( uint32_t srcDevCRC32ID, std::string formatStr );
+        static HNFormatString* allocateFormatString( uint32_t srcDevCRC32ID, uint32_t formatCode );
         static void freeFormatString( HNFormatString *strPtr );
 
     private:

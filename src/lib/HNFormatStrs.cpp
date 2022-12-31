@@ -16,6 +16,7 @@ namespace pdy = Poco::Dynamic;
 
 HNFSInstance::HNFSInstance()
 {
+    m_devCRC32ID = 0;
     m_code = 0;
 }
 
@@ -94,6 +95,11 @@ HNFormatString::HNFormatString( uint32_t srcDevCRC32ID, std::string formatStr )
     calcCode();
 }
 
+HNFormatString::HNFormatString( uint32_t srcDevCRC32ID )
+{
+    m_srcCRC32ID = srcDevCRC32ID;
+}
+
 HNFormatString::~HNFormatString()
 {
 
@@ -105,7 +111,7 @@ HNFormatString::getDevCRC32ID()
     return m_srcCRC32ID;
 }
 
-uint 
+uint32_t 
 HNFormatString::getCode()
 {
     return m_code;
@@ -115,6 +121,24 @@ void
 HNFormatString::setDevCRC32ID( uint32_t value )
 {
     m_srcCRC32ID = value;
+}
+
+void
+HNFormatString::setCode( uint32_t value )
+{
+    m_code = value;
+}
+
+void
+HNFormatString::setFormatStr( std::string value )
+{
+    m_formatStr = value;
+}
+
+void
+HNFormatString::setTemplateStr( std::string value )
+{
+    m_templateStr = value;
 }
 
 void 
@@ -231,6 +255,14 @@ HNFormatStringStore::allocateFormatString( uint32_t srcDevCRC32ID, std::string f
     return new HNFormatString( srcDevCRC32ID, formatStr );
 }
 
+HNFormatString*
+HNFormatStringStore::allocateFormatString( uint32_t srcDevCRC32ID, uint32_t formatCode )
+{
+    HNFormatString *tmpStr = new HNFormatString( srcDevCRC32ID );
+    tmpStr->setCode( formatCode );
+    return tmpStr;
+}
+
 void
 HNFormatStringStore::freeFormatString( HNFormatString *strPtr )
 {
@@ -345,14 +377,22 @@ HNFormatStringStore::fillInstance( uint fmtCode, HNFSInstance *instance, ... )
 std::string
 HNFormatStringStore::renderInstance( HNFSInstance *instance )
 {
-    std::string rtnStr;
+    std::ostringstream rtnStr;
 
     // Scope lock
     std::lock_guard<std::mutex> guard( m_updateMutex );
 
-    rtnStr = "FIXME HNFormatStringStore test return string";
+    std::map< uint32_t, HNFormatString* >::iterator it = m_formatStrs.find( instance->getFmtCode() );
 
-    return rtnStr;
+    if( it == m_formatStrs.end() )
+    {
+        rtnStr << "Format String not available - fmtCode: " << HNodeID::convertCRC32ToStr( instance->getFmtCode() );
+        return rtnStr.str();
+    }
+
+    rtnStr << it->second->getTemplateStr();
+
+    return rtnStr.str();
 }
 
 HNFS_RESULT_T
@@ -376,7 +416,7 @@ HNFormatStringStore::getAllFormatStringsJSON( std::ostream& ostr )
         {
             pjs::Object jsStrObj;
 
-            jsStrObj.set( "fmtCode", it->second->getCode() );
+            jsStrObj.set( "fmtCode", HNodeID::convertCRC32ToStr( it->second->getCode() ) );
             jsStrObj.set( "fmtString", it->second->getFormatStr() );
             jsStrObj.set( "templateString", it->second->getTemplateStr() );
 
@@ -424,12 +464,6 @@ HNFormatStringStore::getSelectFormatStringsJSON( std::istream& istr, std::ostrea
 
             std::cout << "=== HAS strRefs array - size: " << jsRefsArr->size() << " ===" << std::endl;
 
-            // If the component array doesn't have elements, then exit
-            if( jsRefsArr->size() == 0 )
-            {
-                return HNFS_RESULT_SUCCESS;
-            }
-
             // Enumerate through the components in the array
             for( uint i = 0; i < jsRefsArr->size(); i++ )
             {
@@ -444,9 +478,10 @@ HNFormatStringStore::getSelectFormatStringsJSON( std::istream& istr, std::ostrea
                 // Extract fmtCode field
                 if( jsRef->has("fmtCode") == false )
                     continue;
-                uint32_t fmtCode = jsRef->getValue<uint32_t>( "fmtCode" );
+                std::string fmtCodeStr = jsRef->getValue<std::string>( "fmtCode" );
+                uint32_t fmtCode = HNodeID::convertStrToCRC32( fmtCodeStr );
 
-                std::cout << "    child " << i << " - fmtCode: " << fmtCode << std::endl;
+                std::cout << "    child " << i << " - fmtCodeStr: " << fmtCodeStr << "  fmtCode: " << fmtCode << std::endl;
 
                 refFmtCodeArray.push_back( fmtCode );
             }
@@ -479,7 +514,7 @@ HNFormatStringStore::getSelectFormatStringsJSON( std::istream& istr, std::ostrea
             if( it == m_formatStrs.end() )
                 continue;
 
-            jsStrObj.set( "fmtCode", it->second->getCode() );
+            jsStrObj.set( "fmtCode", HNodeID::convertCRC32ToStr( it->second->getCode() ) );
             jsStrObj.set( "fmtString", it->second->getFormatStr() );
             jsStrObj.set( "templateString", it->second->getTemplateStr() );
 
@@ -531,7 +566,7 @@ HNFormatStringCache::reportFormatCode( uint32_t devCRC32ID, uint fmtCode )
     // Scope lock
     std::lock_guard<std::mutex> guard( m_updateMutex );
 
-    std::cout << "HNFormatStringCache::reportFormatCode - code: " << fmtCode << std::endl;
+    std::cout << "HNFormatStringCache::reportFormatCode - dev: " << devCRC32ID << "  code: " << fmtCode << std::endl;
 
     // Empty string is not valid
     if( fmtCode == 0 )
@@ -546,8 +581,14 @@ HNFormatStringCache::reportFormatCode( uint32_t devCRC32ID, uint fmtCode )
         return;
     }
 
+    // Create a new record
+    HNFormatString *tmpStr = HNFormatStringStore::allocateFormatString( devCRC32ID, fmtCode );
+  
+    m_formatStrs.insert( std::pair<uint, HNFormatString*>( tmpStr->getCode(), tmpStr ) );
+
     // Add it to the set of formats that need to be retrieved
-    m_needSrcUpdate.push_back( it->second );
+    std::cout << "HNFormatStringCache::reportFormatCode - needs update for code: " << tmpStr->getCode() << std::endl;
+    m_needSrcUpdate.push_back( tmpStr );
 }
 
 void
@@ -558,9 +599,10 @@ HNFormatStringCache::getUncachedStrRefList( uint32_t srcDevCRC32ID, std::vector<
 
     for( std::vector< HNFormatString* >::iterator it = m_needSrcUpdate.begin(); it != m_needSrcUpdate.end(); it++ )
     {
+        std::cout << "HNFormatStringCache::getUncachedStrRefList - srcDevCRC32ID: " << HNodeID::convertCRC32ToStr( srcDevCRC32ID ) << "  updCRC32ID: " << HNodeID::convertCRC32ToStr( (*it)->getDevCRC32ID() ) << std::endl;
         if( (*it)->getDevCRC32ID() == srcDevCRC32ID )
         {
-            strRefList.push_back("fixme");
+            strRefList.push_back( HNodeID::convertCRC32ToStr( (*it)->getCode() ) );
         }
     }
 
@@ -569,8 +611,18 @@ HNFormatStringCache::getUncachedStrRefList( uint32_t srcDevCRC32ID, std::vector<
 HNFS_RESULT_T
 HNFormatStringCache::updateStringDefinitions( std::string devCRC32ID, std::istream& bodyStream, bool &changed )
 {
-    // {
-    // }
+    // Grab the scope lock
+    const std::lock_guard< std::mutex > lock( m_updateMutex );
+
+    //{
+    //    "deviceCRC32" : "535cd1eb",
+    //    "enabled" : true,
+    //    "strDefs" : [
+    //     {
+    //        "fmtCode" : 1874885357,
+    //        "fmtString" : "Test Name 5",
+    //        "templateString" : "Test Name 5"
+    //     }]}
 
     // Parse the json body of the request
     try
@@ -585,89 +637,83 @@ HNFormatStringCache::updateStringDefinitions( std::string devCRC32ID, std::istre
         std::cout << "updateStringDefinition json:" << std::endl;
         jsRoot->stringify( std::cout, 1 );
 
-#if 0
-        // Make sure the health service is enabled, if not exit
-        if( jsRoot->has( "enabled" ) == false )
+        // If things are not enabled then exit
+        if( jsRoot->has( "enabled") )
         {
-            return HNDH_RESULT_FAILURE;
-        }
-        
-        bool enableVal = jsRoot->getValue<bool>( "enabled" );
-        if( enableVal != true )
-        {   
-            return HNDH_RESULT_FAILURE;            
+            if( jsRoot->getValue<bool>( "enabled" ) == false )
+                return HNFS_RESULT_SUCCESS;
         }
 
-        // Make sure the deviceCRC32 field exists and matches
-        if( jsRoot->has( "deviceCRC32" ) == false )
+        // If the device doesn't match then discard
+        if( jsRoot->has( "deviceCRC32") )
         {
-            return HNDH_RESULT_FAILURE;
-        }
-        
-        std::string jsDevCRC32ID = jsRoot->getValue<std::string>( "deviceCRC32" );
-        if( jsDevCRC32ID != devCRC32ID )
-        {   
-            return HNDH_RESULT_FAILURE;            
+            std::string jsDevCRC32Str = jsRoot->getValue< std::string >( "deviceCRC32" );
+            std::cout << "updateStringDefinition crc check - devCRC32ID:" << devCRC32ID << "  jsDevCRC32Str: " << jsDevCRC32Str << std::endl;
+            if( devCRC32ID != jsDevCRC32Str )
+                return HNFS_RESULT_SUCCESS;
         }
 
-        // Extract the root component.
-        if( jsRoot->has( "rootComponent" ) == false )
+        // Look for the string definitions array
+        if( jsRoot->has( "strDefs" ) )
         {
-            return HNDH_RESULT_FAILURE;
+            pjs::Array::Ptr jsDefsArr = jsRoot->getArray( "strDefs" );        
+
+            std::cout << "=== HAS strDefs array - size: " << jsDefsArr->size() << " ===" << std::endl;
+
+            // If the component array doesn't have elements, then exit
+            if( jsDefsArr->size() == 0 )
+            {
+                return HNFS_RESULT_SUCCESS;
+            }
+
+            // Enumerate through the components in the array
+            for( uint i = 0; i < jsDefsArr->size(); i++ )
+            {
+                std::cout << "    child - index: " << i << std::endl;
+
+                pjs::Object::Ptr jsDef = jsDefsArr->getObject( i );
+
+                // Extract fmtCode field
+                if( jsDef->has("fmtCode") == false )
+                    continue;
+                std::string fmtCodeStr = jsDef->getValue<std::string>( "fmtCode" );
+                uint32_t fmtCode = HNodeID::convertStrToCRC32( fmtCodeStr );
+                std::cout << "    child " << i << " - fmtCodeStr: " << fmtCodeStr << "  fmtCode: " << fmtCode << std::endl;
+
+                // Lookup the FmtString object
+                std::map< uint32_t, HNFormatString* >::iterator it = m_formatStrs.find( fmtCode );
+
+                if( it == m_formatStrs.end() )
+                    continue;
+
+                // Update the string definition
+                changed = true;
+
+                if( jsDef->has("fmtString") )
+                {
+                    std::string fmtStr = jsDef->getValue<std::string>( "fmtString" );
+                    it->second->setFormatStr( fmtStr );
+                }
+
+                if( jsDef->has("templateString") )
+                {
+                    std::string tmplStr = jsDef->getValue<std::string>( "templateString" );
+                    std::cout << "Setting template string: " << tmplStr << std::endl;
+                    it->second->setTemplateStr( tmplStr );
+                }
+
+                // Remove the object from the needs updating array.
+                for( std::vector< HNFormatString* >::iterator it = m_needSrcUpdate.begin(); it != m_needSrcUpdate.end(); it++ )
+                {
+                    if( (*it)->getCode() == fmtCode )
+                    {
+                        std::cout << "m_needSrcUpdate - Erasing: " << fmtCodeStr << std::endl;
+                        m_needSrcUpdate.erase( it );
+                        break;
+                    }
+                }
+            }
         }
-
-        // Get a pointer to the root object
-        pjs::Object::Ptr jsRootComp = jsRoot->getObject( "rootComponent" );
-
-        // Extract root component id and name fields
-        if( jsRootComp->has("id") == false )
-        {
-            return HNDH_RESULT_FAILURE;
-        }
-
-        std::string compID = jsRootComp->getValue<std::string>( "id" );
-
-        // std::cout << "compID: " << compID << "  devCRC32ID: " << devCRC32ID << std::endl;
-
-        // See if there is already a record for this device in the cache
-        std::map< std::string, HNDHComponent* >::iterator dit = m_devHealthTreeMap.find( devCRC32ID );
-
-        if( dit == m_devHealthTreeMap.end() )
-        {
-            // No existing record for the device, so allocate a new one
-            HNDHComponent *newComp = HNDeviceHealth::allocateNewComponent( compID );
-
-            m_devHealthTreeMap.insert( std::pair< std::string, HNDHComponent* >( devCRC32ID, newComp ) );
-
-            dit = m_devHealthTreeMap.find( devCRC32ID );
-
-            changed = true;
-        }
-        else if( dit->second->getID() != compID )
-        {
-            // Free the existing component tree
-            HNDeviceHealth::freeComponentTree( dit->second );
-
-            m_devHealthTreeMap.clear();
-
-            // Start a new tree with the proper root component
-            HNDHComponent *newComp = HNDeviceHealth::allocateNewComponent( compID );
-
-            m_devHealthTreeMap.insert( std::pair< std::string, HNDHComponent* >( devCRC32ID, newComp ) );
-
-            dit = m_devHealthTreeMap.find( devCRC32ID );
-
-            changed = true;
-        }
-
-        bool compChange = false;
-        handleHealthComponentUpdate( &jsRootComp, dit->second, compChange );
-
-        bool childChange = false;
-        handleHealthComponentChildren( &jsRootComp, dit->second, childChange );
-
-        changed = compChange | childChange;
-#endif
     }
     catch( Poco::Exception ex )
     {
@@ -682,12 +728,35 @@ HNFormatStringCache::updateStringDefinitions( std::string devCRC32ID, std::istre
 std::string
 HNFormatStringCache::renderInstance( HNFSInstance *instance )
 {
-    std::string rtnStr;
+    std::ostringstream rtnStr;
 
     // Scope lock
     std::lock_guard<std::mutex> guard( m_updateMutex );
 
-    rtnStr = "FIXME HNFormatStringCache test return string";
+    uint32_t fmtCode = instance->getFmtCode();
 
-    return rtnStr;
+    //std::cout << "HNFormatStringCache::renderInstance - fmtCode: " << HNodeID::convertCRC32ToStr( fmtCode ) << std::endl;
+
+    if( fmtCode == 0 )
+        return rtnStr.str();
+
+    std::map< uint32_t, HNFormatString* >::iterator it = m_formatStrs.find( fmtCode );
+
+    if( it == m_formatStrs.end() )
+    {
+        rtnStr << "Format String not available - fmtCode: " << HNodeID::convertCRC32ToStr( fmtCode );
+        return rtnStr.str();
+    }
+
+    if( it->second->getTemplateStr().empty() == true )
+    {
+        rtnStr << "Format String not available - fmtCode: " << HNodeID::convertCRC32ToStr( fmtCode );
+        return rtnStr.str();
+    }
+
+    //std::cout << "HNFormatStringCache::renderInstance - template: " << it->second->getTemplateStr() << std::endl;
+
+    rtnStr << it->second->getTemplateStr();
+
+    return rtnStr.str();
 }
