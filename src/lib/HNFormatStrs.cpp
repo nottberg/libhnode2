@@ -69,30 +69,6 @@ HNFSInstance::setFmtCode( uint code )
     m_code = code;
 }
 
-#if 0
-std::string
-HNFSInstance::getResultStr()
-{
-    return m_resultStr;
-}
-#endif
-
-#if 0
-std::vector< std::string >&
-HNFSInstance::getParamListRef()
-{
-    return m_paramList;
-}
-#endif
-
-#if 0
-std::string&
-HNFSInstance::getResultStrRef()
-{
-    return m_resultStr;
-}
-#endif
-
 HNFS_RESULT_T
 HNFSInstance::setParameters( HNFormatString *formatStr, va_list vargs )
 {
@@ -327,47 +303,6 @@ HNFormatString::getParameterFormatSpec( uint index )
 {
     return m_formatSpecs[ index ];
 }
-
-#if 0
-HNFS_RESULT_T 
-HNFormatString::applyParameters( va_list vargs, HNFSInstance *instance )
-{
-    char        tmpBuf[4096];
-    std::string builtStr;
-    char        pName[64];
-    bool        changed = false;
- 
-    std::vector< std::string > &paramList = instance->getParamListRef();
-
-    paramList.clear();
-    builtStr = m_templateStr;
-
-    for( uint pindx = 0; pindx < m_formatSpecs.size(); pindx++ )
-    {
-        vsnprintf( tmpBuf, sizeof(tmpBuf), m_formatSpecs[ pindx ].c_str(), vargs );
-        paramList.push_back( tmpBuf );
-
-        uint pLen = sprintf( pName, "{%u}", pindx );
-        size_t pos = builtStr.find( pName );
-        builtStr.replace( pos, pLen, tmpBuf );
-    }
-/*
-    std::string &resultStr = instance->getResultStrRef();
-
-    if( resultStr.size() != builtStr.size() )
-    {
-        resultStr = builtStr;
-        return HNFS_RESULT_SUCCESS_CHANGED;
-    }
-    else if( resultStr != builtStr )
-    {
-        resultStr = builtStr;
-        return HNFS_RESULT_SUCCESS_CHANGED;
-    }
-*/
-    return HNFS_RESULT_SUCCESS;
-}
-#endif
 
 HNFormatStringStore::HNFormatStringStore()
 {

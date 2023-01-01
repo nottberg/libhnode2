@@ -42,8 +42,6 @@ class HNFormatString
 
         HNFS_RESULT_T validateFormat();
 
-        // HNFS_RESULT_T applyParameters( va_list vargs, HNFSInstance *instance );
-
     private:
         void calcCode();
 
@@ -78,10 +76,6 @@ class HNFSInstance
         void populateJSONObject( void *jsObj );
         HNFS_RESULT_T updateFromJSONObject( void *jsSIPtr, bool &changed );
 
-    protected:
-        // std::vector< std::string >& getParamListRef();
-        // std::string& getResultStrRef();
-
     private:
 
         uint32_t m_devCRC32ID;
@@ -89,9 +83,6 @@ class HNFSInstance
 
         std::vector< std::string > m_paramList;
 
-        // std::string m_resultStr;
-
-    friend HNFormatString;
 };
 
 class HNRenderStringIntf

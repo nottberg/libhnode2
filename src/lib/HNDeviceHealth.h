@@ -17,19 +17,6 @@ typedef enum HNDeviceHealthResultEnum {
     HNDH_RESULT_FAILURE
 }HNDH_RESULT_T;
 
-#if 0
-class HNDHFormatStr
-{
-    public:
-        HNDHFormatStr( uint code, std::string formatStr );
-       ~HNDHFormatStr();
-
-    private:
-        uint        m_code;
-        std::string m_formatStr;
-};
-#endif
-
 typedef enum HNDHComponentStandardStatusEnum {
     HNDH_CSTAT_UNKNOWN,
     HNDH_CSTAT_OK,
@@ -58,8 +45,7 @@ class HNDHComponent
         void setParentID( std::string parentID );
 
         void setUpdateTimestamp( time_t updateTS );
-        //void setUpdateTimestampFromStr( std::string updateTS );
-
+    
         std::string getID();
 
         HNDH_CSTAT_T getStatus();
@@ -72,15 +58,7 @@ class HNDHComponent
         std::string getLastUpdateTimeAsStr();
 
         uint getErrorCode();
-        
-        /*
-        std::string getRenderedName();
-        std::string getRenderedDesc();
-        std::string getRenderedNote();
-
-        std::string getRenderedMsg();
-        */
-
+     
         void clearNameInstance();
         HNFSInstance* getNameInstancePtr();
 
@@ -183,7 +161,6 @@ class HNDeviceHealth
         HNDH_CSTAT_T propagateChild( HNDHComponent *comp, bool &changed );
         bool propagateStatus();
 
-        //void populateStrInstJSONObject( void *instObj, HNFSInstance *strInst );
         HNDH_RESULT_T addCompJSONObject( void *listPtr, HNDHComponent *comp );
 
         std::string renderStringInstance( HNFSInstance *strInst );

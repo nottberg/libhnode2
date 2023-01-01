@@ -884,22 +884,6 @@ HNDeviceHealth::propagateStatus()
     return changed;
 }
 
-#if 0
-void
-HNDeviceHealth::populateStrInstJSONObject( void *instObj, HNFSInstance *strInst )
-{
-    pjs::Object *jsInst = (pjs::Object *) instObj;
-
-    jsInst->set("fmtCode", HNodeID::convertCRC32ToStr( strInst->getFmtCode() ) );
-
-    pjs::Array pList;
-
-    for( std::vector< std::string >::iterator it = strInst.; it !=  )
-
-    jsInst->set( "paramList", pList );
-}
-#endif
-
 HNDH_RESULT_T
 HNDeviceHealth::addCompJSONObject( void *listPtr, HNDHComponent *comp )
 {
