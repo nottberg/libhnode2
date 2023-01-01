@@ -109,7 +109,7 @@ class HNDHComponent
 
     private:
         uint32_t    m_devCRC32ID;
-        
+
         std::string m_compID;
 
         HNDH_CSTAT_T m_stdStatus;
@@ -183,7 +183,7 @@ class HNDeviceHealth
         HNDH_CSTAT_T propagateChild( HNDHComponent *comp, bool &changed );
         bool propagateStatus();
 
-        void populateStrInstJSONObject( void *instObj, HNFSInstance *strInst );
+        //void populateStrInstJSONObject( void *instObj, HNFSInstance *strInst );
         HNDH_RESULT_T addCompJSONObject( void *listPtr, HNDHComponent *comp );
 
         std::string renderStringInstance( HNFSInstance *strInst );

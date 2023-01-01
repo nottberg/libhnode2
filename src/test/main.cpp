@@ -332,13 +332,13 @@ class HNode2TestApp : public Poco::Util::Application
                 uint msgcode = 0;
                 HNFS_RESULT_T result = strStore.registerFormatString( 0x10101010, "Format Test string: %d, with %s, and 0x%2x, finally %1.2f", msgcode );
 
-                std::cout << "registerFormatString result: " << result << " with message code: " << msgcode << std::endl;
+                std::cout << "registerFormatString result: " << result << " with message code: " << HNodeID::convertCRC32ToStr( msgcode ) << std::endl;
 
                 HNFSInstance instance;
 
                 strStore.fillInstance( msgcode, &instance, 20, "Test 1", 16, 4.556 );
 
-                std::cout << "Instance Result Str: " << instance.getResultStr() << std::endl;
+                std::cout << "Instance Rendered Str: " << strStore.renderInstance( &instance ) << std::endl;
             }
             else if( _deviceHealthTest == true )
             {

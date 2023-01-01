@@ -36,12 +36,11 @@ HNFSInstance::clear()
 {
     bool changed = false;
 
-    if( (m_code != 0) || (m_paramList.size() != 0) || (m_resultStr.empty() == false) )
+    if( (m_code != 0) || (m_paramList.size() != 0) )
         changed = true;
 
     m_code = 0;
     m_paramList.clear();
-    m_resultStr.clear();
 
     return changed;
 }
@@ -70,23 +69,141 @@ HNFSInstance::setFmtCode( uint code )
     m_code = code;
 }
 
+#if 0
 std::string
 HNFSInstance::getResultStr()
 {
     return m_resultStr;
 }
+#endif
 
+#if 0
 std::vector< std::string >&
 HNFSInstance::getParamListRef()
 {
     return m_paramList;
 }
+#endif
 
+#if 0
 std::string&
 HNFSInstance::getResultStrRef()
 {
     return m_resultStr;
 }
+#endif
+
+HNFS_RESULT_T
+HNFSInstance::setParameters( HNFormatString *formatStr, va_list vargs )
+{
+    char        tmpBuf[4096];
+ 
+    m_paramList.clear();
+
+    for( uint pindx = 0; pindx < formatStr->getParameterCnt(); pindx++ )
+    {
+        vsnprintf( tmpBuf, sizeof(tmpBuf), formatStr->getParameterFormatSpec( pindx ).c_str(), vargs );
+        m_paramList.push_back( tmpBuf );
+    }
+
+    return HNFS_RESULT_SUCCESS_CHANGED;
+}
+
+std::string
+HNFSInstance::createResolvedString( HNFormatString *formatStr )
+{
+    std::string builtStr;
+    char        pName[64];
+ 
+    builtStr = formatStr->getTemplateStr();
+
+    uint pindx = 0;
+    for( std::vector<std::string>::iterator it = m_paramList.begin(); it != m_paramList.end(); it++ )
+    {
+        uint pLen = sprintf( pName, "{%u}", pindx );
+        size_t pos = builtStr.find( pName );
+        builtStr.replace( pos, pLen, *it );
+
+        pindx += 1;
+    }
+
+    return builtStr;
+}
+
+void
+HNFSInstance::populateJSONObject( void *jsObj )
+{
+    pjs::Object *jsInst = (pjs::Object *) jsObj;
+
+    jsInst->set("fmtCode", HNodeID::convertCRC32ToStr( m_code ) );
+
+    pjs::Array pList;
+
+    for( std::vector< std::string >::iterator it = m_paramList.begin(); it != m_paramList.end(); it++ )
+    {
+        pList.add( *it );
+    }
+
+    jsInst->set( "paramList", pList );
+}
+
+HNFS_RESULT_T
+HNFSInstance::updateFromJSONObject( void *jsSIPtr, bool &changed )
+{
+    // Cast the ptr-ptr back to a POCO JSON Ptr
+    pjs::Object::Ptr jsSI = *((pjs::Object::Ptr *) jsSIPtr);
+    
+    if( jsSI->has( "fmtCode" ) )
+    {
+        std::string fmtCodeStr = jsSI->getValue<std::string>( "fmtCode" );
+        uint32_t fmtCode = HNodeID::convertStrToCRC32( fmtCodeStr );
+
+        // std::cout << "      format code: " << fmtCode << std::endl;
+        if( m_code != fmtCode )
+        {
+            m_code = fmtCode;
+            changed = true;
+        }
+    }
+
+    if( jsSI->has("paramList") )
+    {
+        pjs::Array::Ptr jsPArr = jsSI->getArray( "paramList" );        
+
+        std::cout << "=== SI paramList - size: " << jsPArr->size() << " ===" << std::endl;
+
+        if( m_paramList.size() != jsPArr->size() )
+        {
+            m_paramList.clear();
+            changed = true;
+        }
+
+        // Enumerate through the components in the array
+        for( uint i = 0; i < jsPArr->size(); i++ )
+        {
+            std::string jsPStr = jsPArr->getElement<std::string>( i );
+
+            std::cout << "    child - index: " << i << "  str: " << jsPStr << std::endl;
+
+            if( m_paramList.size() > i )
+            {
+                if( m_paramList[i] != jsPStr )
+                {
+                    m_paramList[i] = jsPStr;
+                    changed = true;
+                }
+            }
+            else
+            {
+                m_paramList.push_back( jsPStr );
+                changed = true;
+            }
+        }
+    }
+
+    return HNFS_RESULT_SUCCESS;
+}
+
 
 HNFormatString::HNFormatString( uint32_t srcDevCRC32ID, std::string formatStr )
 {
@@ -199,6 +316,19 @@ HNFormatString::getTemplateStr()
     return m_templateStr;
 }
 
+uint
+HNFormatString::getParameterCnt()
+{
+    return m_formatSpecs.size();
+}
+
+std::string
+HNFormatString::getParameterFormatSpec( uint index )
+{
+    return m_formatSpecs[ index ];
+}
+
+#if 0
 HNFS_RESULT_T 
 HNFormatString::applyParameters( va_list vargs, HNFSInstance *instance )
 {
@@ -221,7 +351,7 @@ HNFormatString::applyParameters( va_list vargs, HNFSInstance *instance )
         size_t pos = builtStr.find( pName );
         builtStr.replace( pos, pLen, tmpBuf );
     }
-
+/*
     std::string &resultStr = instance->getResultStrRef();
 
     if( resultStr.size() != builtStr.size() )
@@ -234,9 +364,10 @@ HNFormatString::applyParameters( va_list vargs, HNFSInstance *instance )
         resultStr = builtStr;
         return HNFS_RESULT_SUCCESS_CHANGED;
     }
-
+*/
     return HNFS_RESULT_SUCCESS;
 }
+#endif
 
 HNFormatStringStore::HNFormatStringStore()
 {
@@ -348,8 +479,8 @@ HNFormatStringStore::fillInstance( uint fmtCode, va_list vargs, HNFSInstance *in
         changed = true;
     }
 
-    // Format the parameters to strings
-    if( it->second->applyParameters( vargs, instance ) == HNFS_RESULT_SUCCESS_CHANGED )
+    // Set the instance parameters
+    if( instance->setParameters( it->second, vargs ) == HNFS_RESULT_SUCCESS_CHANGED )
     {
         changed = true;
     }
@@ -362,9 +493,6 @@ HNFormatStringStore::fillInstance( uint fmtCode, HNFSInstance *instance, ... )
 {
     va_list vargs;
     HNFS_RESULT_T result = HNFS_RESULT_FAILURE;
-
-    // Scope lock
-    std::lock_guard<std::mutex> guard( m_updateMutex );
 
     // Format the parameters to strings
     va_start( vargs, instance );
@@ -382,17 +510,32 @@ HNFormatStringStore::renderInstance( HNFSInstance *instance )
     // Scope lock
     std::lock_guard<std::mutex> guard( m_updateMutex );
 
-    std::map< uint32_t, HNFormatString* >::iterator it = m_formatStrs.find( instance->getFmtCode() );
+    uint32_t fmtCode = instance->getFmtCode();
+
+    //std::cout << "HNFormatStringStore::renderInstance - fmtCode: " << HNodeID::convertCRC32ToStr( fmtCode ) << std::endl;
+
+    if( fmtCode == 0 )
+        return rtnStr.str();
+
+    std::map< uint32_t, HNFormatString* >::iterator it = m_formatStrs.find( fmtCode );
 
     if( it == m_formatStrs.end() )
     {
-        rtnStr << "Format String not available - fmtCode: " << HNodeID::convertCRC32ToStr( instance->getFmtCode() );
+        rtnStr << "Format String not available - fmtCode: " << HNodeID::convertCRC32ToStr( fmtCode );
         return rtnStr.str();
     }
 
-    rtnStr << it->second->getTemplateStr();
+    if( it->second->getTemplateStr().empty() == true )
+    {
+        rtnStr << "Format String not available - fmtCode: " << HNodeID::convertCRC32ToStr( fmtCode );
+        return rtnStr.str();
+    }
 
-    return rtnStr.str();
+    //std::cout << "HNFormatStringStore::renderInstance - template: " << it->second->getTemplateStr() << std::endl;
+
+    rtnStr << instance->createResolvedString( it->second );
+
+    return rtnStr.str();    
 }
 
 HNFS_RESULT_T
@@ -756,7 +899,7 @@ HNFormatStringCache::renderInstance( HNFSInstance *instance )
 
     //std::cout << "HNFormatStringCache::renderInstance - template: " << it->second->getTemplateStr() << std::endl;
 
-    rtnStr << it->second->getTemplateStr();
+    rtnStr << instance->createResolvedString( it->second );
 
     return rtnStr.str();
 }

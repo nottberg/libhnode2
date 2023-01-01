@@ -16,6 +16,46 @@ typedef enum HNFormatStrsResultEnum {
     HNFS_RESULT_FAILURE
 }HNFS_RESULT_T;
 
+class HNFSInstance;
+
+class HNFormatString
+{
+    public:
+        HNFormatString( uint32_t srcDeviceCRC32ID, std::string formatStr );
+        HNFormatString( uint32_t srcDeviceCRC32ID );
+       ~HNFormatString();
+
+        uint32_t getDevCRC32ID();
+        uint32_t getCode();
+
+        std::string getFormatStr();
+        std::string getTemplateStr();
+
+        uint getParameterCnt();
+        std::string getParameterFormatSpec( uint index );
+
+        void setDevCRC32ID( uint32_t value );
+        void setCode( uint32_t value );
+
+        void setFormatStr( std::string value );
+        void setTemplateStr( std::string value );
+
+        HNFS_RESULT_T validateFormat();
+
+        // HNFS_RESULT_T applyParameters( va_list vargs, HNFSInstance *instance );
+
+    private:
+        void calcCode();
+
+        uint32_t  m_srcCRC32ID;
+        uint      m_code;
+
+        std::string m_formatStr;
+        std::string m_templateStr;
+
+        std::vector< std::string > m_formatSpecs;
+};
+
 class HNFSInstance
 {
     public:
@@ -31,11 +71,16 @@ class HNFSInstance
         void setDevCRC32ID( uint32_t devCRC32ID );
         void setFmtCode( uint code );
 
-        std::string getResultStr();
-        
+        HNFS_RESULT_T setParameters( HNFormatString *formatStr, va_list vargs );
+
+        std::string createResolvedString( HNFormatString *formatStr );
+
+        void populateJSONObject( void *jsObj );
+        HNFS_RESULT_T updateFromJSONObject( void *jsSIPtr, bool &changed );
+
     protected:
-        std::vector< std::string >& getParamListRef();
-        std::string& getResultStrRef();
+        // std::vector< std::string >& getParamListRef();
+        // std::string& getResultStrRef();
 
     private:
 
@@ -44,44 +89,9 @@ class HNFSInstance
 
         std::vector< std::string > m_paramList;
 
-        std::string m_resultStr;
+        // std::string m_resultStr;
 
     friend HNFormatString;
-};
-
-class HNFormatString
-{
-    public:
-        HNFormatString( uint32_t srcDeviceCRC32ID, std::string formatStr );
-        HNFormatString( uint32_t srcDeviceCRC32ID );
-       ~HNFormatString();
-
-        uint32_t getDevCRC32ID();
-        uint32_t getCode();
-
-        std::string getFormatStr();
-        std::string getTemplateStr();
-
-        void setDevCRC32ID( uint32_t value );
-        void setCode( uint32_t value );
-
-        void setFormatStr( std::string value );
-        void setTemplateStr( std::string value );
-
-        HNFS_RESULT_T validateFormat();
-
-        HNFS_RESULT_T applyParameters( va_list vargs, HNFSInstance *instance );
-
-    private:
-        void calcCode();
-
-        uint32_t  m_srcCRC32ID;
-        uint      m_code;
-
-        std::string m_formatStr;
-        std::string m_templateStr;
-
-        std::vector< std::string > m_formatSpecs;
 };
 
 class HNRenderStringIntf

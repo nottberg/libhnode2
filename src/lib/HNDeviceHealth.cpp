@@ -884,13 +884,21 @@ HNDeviceHealth::propagateStatus()
     return changed;
 }
 
+#if 0
 void
 HNDeviceHealth::populateStrInstJSONObject( void *instObj, HNFSInstance *strInst )
 {
     pjs::Object *jsInst = (pjs::Object *) instObj;
 
-    jsInst->set("fmtCode", strInst->getFmtCode() );
+    jsInst->set("fmtCode", HNodeID::convertCRC32ToStr( strInst->getFmtCode() ) );
+
+    pjs::Array pList;
+
+    for( std::vector< std::string >::iterator it = strInst.; it !=  )
+
+    jsInst->set( "paramList", pList );
 }
+#endif
 
 HNDH_RESULT_T
 HNDeviceHealth::addCompJSONObject( void *listPtr, HNDHComponent *comp )
@@ -905,19 +913,19 @@ HNDeviceHealth::addCompJSONObject( void *listPtr, HNDHComponent *comp )
     jsComp.set( "updateTime", comp->getLastUpdateTime() );
 
     pjs::Object jsNameInst;
-    populateStrInstJSONObject( &jsNameInst, comp->getNameInstancePtr() );
+    comp->getNameInstancePtr()->populateJSONObject( &jsNameInst );
     jsComp.set( "nameSI", jsNameInst );
 
     pjs::Object jsDescInst;
-    populateStrInstJSONObject( &jsDescInst, comp->getDescInstancePtr() );
+    comp->getDescInstancePtr()->populateJSONObject( &jsDescInst );
     jsComp.set( "descSI", jsDescInst );
 
     pjs::Object jsMsgInst;
-    populateStrInstJSONObject( &jsMsgInst, comp->getMsgInstancePtr() );
+    comp->getMsgInstancePtr()->populateJSONObject( &jsMsgInst );
     jsComp.set( "msgSI", jsMsgInst );
 
     pjs::Object jsNoteInst;
-    populateStrInstJSONObject( &jsNoteInst, comp->getNoteInstancePtr() );
+    comp->getNoteInstancePtr()->populateJSONObject( &jsNoteInst );
     jsComp.set( "noteSI", jsNoteInst );
 
     pjs::Array jsChildList;
@@ -976,19 +984,19 @@ HNDeviceHealth::getRestJSON( std::ostream &oStream )
         jsCompRoot.set( "updateTime", m_devStatus->getLastUpdateTime() );
 
         pjs::Object jsNameInst;
-        populateStrInstJSONObject( &jsNameInst, m_devStatus->getNameInstancePtr() );
+        m_devStatus->getNameInstancePtr()->populateJSONObject( &jsNameInst );
         jsCompRoot.set( "nameSI", jsNameInst );
 
         pjs::Object jsDescInst;
-        populateStrInstJSONObject( &jsDescInst, m_devStatus->getDescInstancePtr() );
+        m_devStatus->getDescInstancePtr()->populateJSONObject( &jsDescInst );
         jsCompRoot.set( "descSI", jsDescInst );
 
         pjs::Object jsMsgInst;
-        populateStrInstJSONObject( &jsMsgInst, m_devStatus->getMsgInstancePtr() );
+        m_devStatus->getMsgInstancePtr()->populateJSONObject( &jsMsgInst );
         jsCompRoot.set( "msgSI", jsMsgInst );
 
         pjs::Object jsNoteInst;
-        populateStrInstJSONObject( &jsNoteInst, m_devStatus->getNoteInstancePtr() );
+        m_devStatus->getNoteInstancePtr()->populateJSONObject( &jsNoteInst );
         jsCompRoot.set( "noteSI", jsNoteInst );
 
         pjs::Array jsChildList;
@@ -1277,23 +1285,17 @@ HNHealthCache::updateDeviceHealth( uint32_t devCRC32ID, std::istream& bodyStream
 HNDH_RESULT_T
 HNHealthCache::handleHealthComponentStrInstanceUpdate( void *jsSIPtr, HNFSInstance *strInstPtr, bool &changed )
 {
-    // Cast the ptr-ptr back to a POCO JSON Ptr
-    pjs::Object::Ptr jsSI = *((pjs::Object::Ptr *) jsSIPtr);
+    bool siChanged = false;
 
-    if( jsSI->has( "fmtCode" ) )
+    strInstPtr->updateFromJSONObject( jsSIPtr, siChanged );
+
+    if( siChanged == true )
     {
-        uint fmtCode = jsSI->getValue<uint>( "fmtCode" );
-        // std::cout << "      format code: " << fmtCode << std::endl;
-        if( strInstPtr->getFmtCode() != fmtCode )
-        {
-            strInstPtr->setFmtCode( fmtCode );
-
-            // Register fmtCode usage with string store cache, in case its a new one.
-            if( m_strCache )
-                m_strCache->reportFormatCode( strInstPtr->getDevCRC32ID(), fmtCode );
+        // Register fmtCode usage with string store cache, in case its a new one.
+        if( m_strCache )
+            m_strCache->reportFormatCode( strInstPtr->getDevCRC32ID(), strInstPtr->getFmtCode() );
             
-            changed = true;
-        }
+        changed = true;
     }
 
     return HNDH_RESULT_SUCCESS;
