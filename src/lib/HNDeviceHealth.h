@@ -48,6 +48,8 @@ class HNDHComponent
     
         std::string getID();
 
+        uint32_t getDevCRC32ID();
+
         HNDH_CSTAT_T getStatus();
         std::string getStatusAsStr();
 
@@ -82,6 +84,8 @@ class HNDHComponent
         void deleteChildByID( std::string compID );
 
         std::vector< HNDHComponent* >& getChildListRef();
+
+        void generateChildComponentJSON( void *jsHealthCompArray, std::string parentID, HNRenderStringIntf *renderIntf );
 
         void debugPrint( uint offset, HNRenderStringIntf *renderIntf, bool printChildren );
 
@@ -213,7 +217,7 @@ class HNHealthCache
 
         HNDH_RESULT_T updateDeviceHealth( uint32_t devCRC32ID, std::istream& bodyStream, bool &changed );
 
-        std::string getHealthReportAsJSON();
+        void generateAllDeviceHealthReportAsJSON( std::ostream &bodyStream );
 
         void debugPrintHealthReport();
 

@@ -105,6 +105,12 @@ HNDHComponent::getID()
     return m_compID;
 }
 
+uint32_t
+HNDHComponent::getDevCRC32ID()
+{
+    return m_devCRC32ID;
+}
+
 HNDH_CSTAT_T
 HNDHComponent::getStatus()
 {
@@ -375,6 +381,46 @@ std::vector< HNDHComponent* >&
 HNDHComponent::getChildListRef()
 {
     return m_children;
+}
+
+void
+HNDHComponent::generateChildComponentJSON( void *jsHealthCompArray, std::string parentID, HNRenderStringIntf *renderIntf )
+{
+    pjs::Array *jsHCArrayPtr = (pjs::Array *) jsHealthCompArray;
+    pjs::Object jsComp;
+
+    std::string myID = parentID + "-" + getID();
+    jsComp.set( "id", myID );
+    jsComp.set( "parentID", parentID );
+    jsComp.set( "devCRC32ID", HNodeID::convertCRC32ToStr( getDevCRC32ID() ) );
+    jsComp.set( "name", renderIntf->renderInstance( getNameInstancePtr() ) );
+    jsComp.set( "status", getPropagatedStatusAsStr() );
+    jsComp.set( "errCode", getErrorCode() );
+    jsComp.set( "updateTime", getLastUpdateTimeAsStr() );
+
+    jsComp.set( "descText", renderIntf->renderInstance( getDescInstancePtr() ) );
+
+    std::string noteStr = renderIntf->renderInstance( getNoteInstancePtr() );
+    std::string errorStr = renderIntf->renderInstance( getMsgInstancePtr() );
+
+    std::string alertText;
+    if( errorStr.empty() == false )
+    {
+        alertText += errorStr + "\n";
+    }
+    
+    if( noteStr.empty() == false )
+    {
+        alertText += noteStr + "\n";
+    }
+    jsComp.set( "alertText", alertText );
+
+    jsHCArrayPtr->add( jsComp );
+
+    for( std::vector< HNDHComponent* >::iterator it = m_children.begin(); it != m_children.end(); it++ )
+    {
+        (*it)->generateChildComponentJSON( jsHCArrayPtr, myID, renderIntf );
+    }
 }
 
 void
@@ -1107,10 +1153,33 @@ HNHealthCache::setFormatStringCache( HNFormatStringCache *strCachePtr )
     m_strCache = strCachePtr;
 }
 
-std::string
-HNHealthCache::getHealthReportAsJSON()
+void
+HNHealthCache::generateAllDeviceHealthReportAsJSON( std::ostream &bodyStream )
 {
-    return "";
+    pjs::Object jsRoot;
+    pjs::Array  jsDevArray;
+    pjs::Array  jsHealthArray;
+
+    for( std::map< uint32_t, HNDHComponent* >::iterator it = m_devHealthTreeMap.begin(); it != m_devHealthTreeMap.end(); it++ )
+    {
+        pjs::Object jsDev;
+
+        std::string crc32ID = HNodeID::convertCRC32ToStr( it->first );
+        jsDev.set( "id",  crc32ID );
+
+        jsDevArray.add( jsDev );
+
+        // Add child components
+        it->second->generateChildComponentJSON( &jsHealthArray, "", m_strCache );
+    }
+
+    jsRoot.set( "healthArray", jsHealthArray );
+    jsRoot.set( "deviceArray", jsDevArray );
+
+    try {
+        pjs::Stringifier::stringify( jsRoot, bodyStream, 0 );
+    } catch( ... ) {
+    }    
 }
 
 void
