@@ -1,3 +1,15 @@
+#include <sys/socket.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <net/if.h>
+#include <ifaddrs.h>
+#include <linux/if_link.h>
+
 #include <iostream>
 
 #include "Poco/Net/HTTPServer.h"
@@ -12,6 +24,7 @@
 #include <Poco/JSON/Object.h>
 #include <Poco/JSON/Parser.h>
 
+#include "HNHostNetwork.h"
 #include "HNHttpServer.h"
 
 namespace pjs = Poco::JSON;
@@ -231,6 +244,25 @@ HNHttpServer::registerEndpointsFromOpenAPI( std::string dispatchID, HNRestDispat
 
 }
 
+std::string
+HNHttpServer::formatURI( std::string defaultAddress, std::string extPath )
+{
+    Poco::URI uri;
+
+    uri.setScheme( "http" );
+    uri.setHost( defaultAddress );
+    uri.setPort( m_port );
+
+    std::string path = "hnode2";
+
+    if( extPath.empty() == false )
+        path += "/" + extPath;
+
+    uri.setPath( path );
+
+    return uri.toString();
+}
+
 void
 HNHttpServer::start()
 {
@@ -241,5 +273,6 @@ HNHttpServer::start()
     m_srvPtr = (void *) new pn::HTTPServer( ((HNRestHandlerFactory *) m_facPtr), svs, new pn::HTTPServerParams );
     ((pn::HTTPServer*)m_srvPtr)->start();
     
-     std::cout << "Started HttpServer..." << std::endl; 
+     std::cout << "Started HttpServer - addr: " << svs.address().toString() << std::endl;
 }
+

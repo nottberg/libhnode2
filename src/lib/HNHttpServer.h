@@ -16,6 +16,8 @@ class HNHttpServer
         
         void registerEndpointsFromOpenAPI( std::string dispatchID, HNRestDispatchInterface *dispatchInf, std::string openAPIJson );
 
+        std::string formatURI( std::string defaultAddress, std::string path );
+
         void start();
 
     private:

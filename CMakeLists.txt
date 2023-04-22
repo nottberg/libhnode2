@@ -25,24 +25,36 @@ SET( HNODE2_LIB_SRC ${CMAKE_SOURCE_DIR}/src/lib/HNHttpServer.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNRestHandler.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNReqWaitQueue.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNSigSyncQueue.cpp
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNHttpEventClient.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNAvahi.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNAvahiBrowser.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNodeID.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNodeConfig.cpp
                     ${CMAKE_SOURCE_DIR}/src/lib/HNEPLoop.cpp
                     #${CMAKE_SOURCE_DIR}/src/lib/HNDeviceRestHandler.cpp
-                    ${CMAKE_SOURCE_DIR}/src/lib/HNodeDevice.cpp )
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNHostNetwork.cpp
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNodeDevice.cpp
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNFormatStrs.cpp
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNDeviceHealth.cpp
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNDeviceLogging.cpp
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNDeviceStats.cpp )
 
 SET( HNODE2_LIB_HDR ${CMAKE_SOURCE_DIR}/src/lib/HNHttpServer.h 
                     ${CMAKE_SOURCE_DIR}/src/lib/HNRestHandler.h
                     ${CMAKE_SOURCE_DIR}/src/lib/HNReqWaitQueue.h
                     ${CMAKE_SOURCE_DIR}/src/lib/HNSigSyncQueue.h
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNHttpEventClient.h
                     ${CMAKE_SOURCE_DIR}/src/lib/HNAvahi.h
                     ${CMAKE_SOURCE_DIR}/src/lib/HNAvahiBrowser.h
                     ${CMAKE_SOURCE_DIR}/src/lib/HNodeID.h
                     ${CMAKE_SOURCE_DIR}/src/lib/HNodeConfig.h
                     ${CMAKE_SOURCE_DIR}/src/lib/HNEPLoop.h
-                    ${CMAKE_SOURCE_DIR}/src/lib/HNodeDevice.h )
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNHostNetwork.h                    
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNodeDevice.h
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNFormatStrs.h
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNDeviceHealth.h
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNDeviceLogging.h
+                    ${CMAKE_SOURCE_DIR}/src/lib/HNDeviceStats.h )
 
 ADD_LIBRARY( hnode2 SHARED ${HNODE2_LIB_SRC} )
 SET_TARGET_PROPERTIES( hnode2 PROPERTIES VERSION ${VERSION} SOVERSION ${MAJOR_VERSION} )

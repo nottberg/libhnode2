@@ -17,6 +17,9 @@
 #include "HNAvahiBrowser.h"
 #include "HNodeID.h"
 #include "HNodeConfig.h"
+#include "HNFormatStrs.h"
+#include "HNDeviceHealth.h"
+#include "HNHostNetwork.h"
 
 #define MAXEVENTS 8
 
@@ -29,6 +32,9 @@ class HNode2TestApp : public Poco::Util::Application
         bool _avahiBrowserTest;
         bool _hnodeIDTest;
         bool _hnodeConfigTest;
+        bool _formatStrsTest;
+        bool _deviceHealthTest;
+        bool _hostNetworkTest;
 
     protected:
         void initialize( Poco::Util::Application& application )
@@ -50,6 +56,9 @@ class HNode2TestApp : public Poco::Util::Application
             _avahiBrowserTest = false;
             _hnodeIDTest      = false;
             _hnodeConfigTest  = false;
+            _formatStrsTest   = false;
+            _deviceHealthTest = false;
+            _hostNetworkTest  = false;
 
             Poco::Util::Application::defineOptions( optionSet );
 
@@ -77,6 +86,17 @@ class HNode2TestApp : public Poco::Util::Application
                 Poco::Util::Option( "hnodecfg", "c", "Run HNodeConfig test." ).callback( Poco::Util::OptionCallback<HNode2TestApp>(this, &HNode2TestApp::handleTest ) )
             );
 
+            optionSet.addOption(
+                Poco::Util::Option( "formatstr", "f", "Run FormatStr test." ).callback( Poco::Util::OptionCallback<HNode2TestApp>(this, &HNode2TestApp::handleTest ) )
+            );
+
+            optionSet.addOption(
+                Poco::Util::Option( "devicehealth", "x", "Run Device Health test." ).callback( Poco::Util::OptionCallback<HNode2TestApp>(this, &HNode2TestApp::handleTest ) )
+            );
+
+            optionSet.addOption(
+                Poco::Util::Option( "hostNetwork", "n", "Run HNHostNetwork test." ).callback( Poco::Util::OptionCallback<HNode2TestApp>(this, &HNode2TestApp::handleTest ) )
+            );
         }
 
         void displayHelp()
@@ -110,7 +130,12 @@ class HNode2TestApp : public Poco::Util::Application
                 _hnodeIDTest = true;
             else if( name == "hnodecfg" )
                 _hnodeConfigTest = true;
-
+            else if( name == "formatstr" )
+                _formatStrsTest = true;
+            else if( name == "devicehealth" )
+                _deviceHealthTest = true;
+            else if( name == "hostNetwork" )
+                _hostNetworkTest = true;
         }
 
         int main( const std::vector<std::string> &arguments )
@@ -297,6 +322,125 @@ class HNode2TestApp : public Poco::Util::Application
                 }
 
                 cfg2.debugPrint(2);
+            }
+            else if( _formatStrsTest == true )
+            {
+                std::cout << "Running HNFormatStrs test..." << std::endl;
+
+                HNFormatStringStore  strStore;
+
+                uint msgcode = 0;
+                HNFS_RESULT_T result = strStore.registerFormatString( 0x10101010, "Format Test string: %d, with %s, and 0x%2x, finally %1.2f", msgcode );
+
+                std::cout << "registerFormatString result: " << result << " with message code: " << HNodeID::convertCRC32ToStr( msgcode ) << std::endl;
+
+                HNFSInstance instance;
+
+                strStore.fillInstance( msgcode, &instance, 20, "Test 1", 16, 4.556 );
+
+                std::cout << "Instance Rendered Str: " << strStore.renderInstance( &instance ) << std::endl;
+            }
+            else if( _deviceHealthTest == true )
+            {
+                std::cout << "Running Device Health test..." << std::endl;
+
+                HNHttpEventClient evClient;
+                HNFormatStringStore  strStore;
+                HNDeviceHealth deviceHealth( &strStore, &evClient );
+
+                // Register format strings
+                uint warncode = 0;
+                uint troublecode = 0;
+                uint failedcode = 0;
+                HNFS_RESULT_T result = strStore.registerFormatString( 0xbc453423, "Warning: %d", warncode );
+                std::cout << "registerFormatString result: " << result << " with message code: " << warncode << std::endl;
+
+                result = strStore.registerFormatString( 0xbc453423, "Trouble: %s", troublecode );
+                std::cout << "registerFormatString result: " << result << " with message code: " << troublecode << std::endl;
+
+                result = strStore.registerFormatString( 0xbc453423, "Failure: %f", failedcode );
+                std::cout << "registerFormatString result: " << result << " with message code: " << failedcode << std::endl;
+
+                // Setup component structure
+                deviceHealth.updateDeviceInfo( "hnode-test-util-bc453423-name", "Irrigation Device" );
+
+                std::string comp1ID;
+                deviceHealth.registerComponent( "comp 1", HNDH_ROOT_COMPID, comp1ID );
+
+                std::string comp2ID;
+                deviceHealth.registerComponent( "comp 2", HNDH_ROOT_COMPID, comp2ID );
+
+                std::string comp3ID;
+                deviceHealth.registerComponent( "comp 3", comp2ID, comp3ID );
+
+                std::string comp4ID;
+                deviceHealth.registerComponent( "comp 4", comp2ID, comp4ID );
+
+                std::string comp5ID;
+                deviceHealth.registerComponent( "comp 5", comp4ID, comp5ID );
+
+                // Update cycle 1
+                deviceHealth.startUpdateCycle( time(NULL) );
+
+                deviceHealth.setComponentStatus( HNDH_ROOT_COMPID, HNDH_CSTAT_OK );
+                deviceHealth.setComponentStatus( comp1ID, HNDH_CSTAT_OK );
+                deviceHealth.setComponentStatus( comp2ID, HNDH_CSTAT_OK );
+                deviceHealth.setComponentStatus( comp3ID, HNDH_CSTAT_OK );
+                deviceHealth.setComponentStatus( comp4ID, HNDH_CSTAT_OK );
+                deviceHealth.setComponentStatus( comp5ID, HNDH_CSTAT_OK );
+                
+                bool changed = deviceHealth.completeUpdateCycle();
+
+                std::cout << "Update1 changed: " << changed << std::endl;
+
+                std::string healthJSON;
+
+                deviceHealth.getRestJSON( healthJSON );
+
+                std::cout << "=== HEALTH REST JSON (cycle 1) ===" << std::endl << healthJSON << std::endl;
+
+                // Delay between updates
+                sleep(3);
+
+                // Update cycle 2
+                deviceHealth.startUpdateCycle( time(NULL) );
+
+                deviceHealth.setComponentStatus( comp5ID, HNDH_CSTAT_FAILED );
+                deviceHealth.setComponentErrMsg( comp5ID, 210, failedcode, 3.145 );
+
+                changed = deviceHealth.completeUpdateCycle();
+
+                std::cout << "Update2 changed: " << changed << std::endl;
+
+                deviceHealth.getRestJSON( healthJSON );
+
+                std::cout << "=== HEALTH REST JSON (cycle 2)  ===" << std::endl << healthJSON << std::endl;
+
+
+                // Delay between updates
+                sleep(3);
+
+                // Update cycle 3
+                deviceHealth.startUpdateCycle( time(NULL) );
+
+                deviceHealth.setComponentStatus( comp5ID, HNDH_CSTAT_OK );
+                deviceHealth.clearComponentErrMsg( comp5ID );
+
+                changed = deviceHealth.completeUpdateCycle();
+
+                std::cout << "Update3 changed: " << changed << std::endl;
+
+                deviceHealth.getRestJSON( healthJSON );
+
+                std::cout << "=== HEALTH REST JSON (cycle 3)  ===" << std::endl << healthJSON << std::endl;                 
+            }
+            else if( _hostNetworkTest == true )
+            {
+                HNHostNetwork net;
+
+                net.refreshData();
+
+                net.debugPrint();         
             }
 
             //std::cout << "We are now in main. Option is " << this->config().getString( "optionval" ) << std::endl;
